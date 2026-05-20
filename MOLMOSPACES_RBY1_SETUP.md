@@ -1,0 +1,387 @@
+# MolmoSpaces RBY1 Setup Notes
+
+This documents the setup path used to run RBY1 door-opening simulation in `molmospaces`.
+
+## 1. Work On A Branch
+
+Use a branch in the `molmospaces` repo for local simulation fixes:
+
+```bash
+cd /home/jinyoon/workspace/live-robotics-lab-project/molmospaces
+git checkout -b rby1-sim-bringup
+```
+
+If the branch already exists:
+
+```bash
+git checkout rby1-sim-bringup
+```
+
+## 2. Create The Conda Environment
+
+```bash
+cd /home/jinyoon/workspace/live-robotics-lab-project/molmospaces
+conda create -n mlspaces python=3.11
+conda activate mlspaces
+```
+
+Install base MolmoSpaces with MuJoCo support:
+
+```bash
+pip install -e ".[mujoco]"
+```
+
+If native package builds fail with `gcc: No such file or directory`, install build tools:
+
+```bash
+sudo apt update
+sudo apt install -y build-essential python3-dev
+```
+
+## 3. Install MolmoSpaces Assets
+
+The assets should be installed through the MolmoSpaces resource manager, not by manually downloading random files.
+
+```bash
+cd /home/jinyoon/workspace/live-robotics-lab-project/molmospaces
+conda activate mlspaces
+
+export PYTHONPATH="${PYTHONPATH}:."
+export MLSPACES_FORCE_INSTALL=True
+
+python -m molmo_spaces.molmo_spaces_constants
+```
+
+This populates cache/resource directories such as:
+
+```bash
+~/.cache/molmo-spaces-resources
+~/.cache/molmospaces
+```
+
+If a previous interrupted install leaves broken cache state, fix ownership and reset caches:
+
+```bash
+sudo chown -R jinyoon:jinyoon ~/.cache/molmo-spaces-resources ~/.cache/molmospaces ~/nltk_data
+rm -rf ~/.cache/molmo-spaces-resources ~/.cache/molmospaces
+```
+
+Then rerun:
+
+```bash
+python -m molmo_spaces.molmo_spaces_constants
+```
+
+## 4. Install RBY1/cuRobo Dependencies
+
+RBY1 door-opening uses cuRobo, which is not included in `.[mujoco]`.
+
+Install CUDA toolkit/build dependencies in the conda env:
+
+```bash
+conda activate mlspaces
+conda install -c conda-forge cuda-toolkit=12.8 ninja evdev cuda-nvcc cuda-cudart-dev -n mlspaces
+```
+
+Install PyTorch matching CUDA 12.8:
+
+```bash
+pip install --force-reinstall "torch==2.7.1" "torchvision==0.22.1" \
+  --index-url https://download.pytorch.org/whl/cu128
+```
+
+Verify PyTorch and `nvcc` match:
+
+```bash
+python - <<'PY'
+import torch
+print(torch.__version__)
+print(torch.version.cuda)
+PY
+nvcc --version
+```
+
+Expected:
+
+```text
+2.7.1+cu128
+12.8
+nvcc ... release 12.8
+```
+
+Install cuRobo:
+
+```bash
+export CUDA_HOME=$CONDA_PREFIX
+export CPATH=$(dirname $(find $CONDA_PREFIX -name "cuda_runtime_api.h" | head -1)):$CPATH
+export TORCH_CUDA_ARCH_LIST="7.5;8.0;8.6;8.9;9.0"
+export MAX_JOBS=2
+
+pip install --no-build-isolation \
+  "nvidia-curobo @ git+https://github.com/allenai/curobo.git@87e857d46fa5398f268c7f31d26566351be8671d"
+```
+
+If the build runs out of memory, retry with:
+
+```bash
+export MAX_JOBS=1
+```
+
+## 5. Verify NVIDIA Driver/CUDA Runtime
+
+The conda CUDA toolkit is not enough. The host needs a working NVIDIA driver.
+
+Check:
+
+```bash
+nvidia-smi
+```
+
+Then check inside the conda env:
+
+```bash
+conda activate mlspaces
+python - <<'PY'
+import torch
+print("cuda available:", torch.cuda.is_available())
+print("device count:", torch.cuda.device_count())
+print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else "no cuda")
+PY
+```
+
+Expected:
+
+```text
+cuda available: True
+device count: 1
+NVIDIA GeForce RTX 4060 ...
+```
+
+## 6. Run RBY1 Door Opening Debug
+
+```bash
+cd /home/jinyoon/workspace/live-robotics-lab-project/molmospaces
+conda activate mlspaces
+
+export PYTHONPATH="${PYTHONPATH}:."
+export MUJOCO_GL=egl
+export PYOPENGL_PLATFORM=egl
+export MUJOCO_EGL_DEVICE_ID=0
+export JAX_PLATFORMS=cpu
+
+python -m molmo_spaces.data_generation.main DoorOpeningDebugConfig
+```
+
+Successful run should end with:
+
+```text
+Completed 1 houses, skipped 0 houses
+Success count: 1, Total count: 1
+Success rate: 100.00%
+```
+
+## 7. Optional Teleop Testing
+
+The baseline keyboard teleop path:
+
+```bash
+python scripts/datagen/run_pipeline.py --viewer --policy teleop --robot rum
+```
+
+A separate fast teleop sandbox was added on the local test branch:
+
+```bash
+python scripts/datagen/run_fast_teleop.py --robot rum
+```
+
+Useful tuning arguments:
+
+```bash
+python scripts/datagen/run_fast_teleop.py \
+  --robot rum \
+  --step_size 0.03 \
+  --rot_step 0.08 \
+  --img_width 320 \
+  --img_height 240
+```
+
+## 8. MolmoBot-SPOC RBY1 Eval Setup
+
+MolmoBot-SPOC uses MolmoSpaces for the simulator, robot, cameras, scenes, and benchmark episodes. The MolmoBot-SPOC side provides the learned policy/model and checkpoint loading.
+
+Install the local SPOC package into the existing `mlspaces` environment:
+
+```bash
+cd /home/jinyoon/workspace/live-robotics-lab-project/MolmoBot/MolmoBot-SPOC
+conda activate mlspaces
+pip install -e .
+```
+
+If this changes MolmoSpaces-related dependency versions, restore the local MolmoSpaces install:
+
+```bash
+cd /home/jinyoon/workspace/live-robotics-lab-project/molmospaces
+conda activate mlspaces
+pip install -e .[mujoco] --no-deps
+pip install "mujoco-mjx~=3.5.0" "molmospaces-resources==0.0.1b4"
+```
+
+Verify that Python imports the local editable repos:
+
+```bash
+python - <<'PY'
+import molmo_spaces, molmobot_spoc, transformers
+import mujoco.mjx
+import molmospaces_resources
+
+print("imports ok")
+print("molmo_spaces:", molmo_spaces.__file__)
+print("molmobot_spoc:", molmobot_spoc.__file__)
+print("transformers:", transformers.__version__)
+print("molmospaces_resources:", molmospaces_resources.__file__)
+PY
+```
+
+Expected local paths should point into:
+
+```text
+/home/jinyoon/workspace/live-robotics-lab-project/molmospaces
+/home/jinyoon/workspace/live-robotics-lab-project/MolmoBot/MolmoBot-SPOC
+```
+
+## 9. Hugging Face Model Download On This Ubuntu Setup
+
+The RBY1 rigid MolmoBot-SPOC checkpoint is:
+
+```text
+allenai/MolmoBot-SPOC-RBY1Rigid
+```
+
+The repo was reachable without Hugging Face login, but this machine had broken/slow IPv6 access to Hugging Face. `curl -4` worked, while `curl -6` timed out. Force IPv4 for the Python model download:
+
+```bash
+cd /home/jinyoon/workspace/live-robotics-lab-project/MolmoBot/MolmoBot-SPOC
+conda activate mlspaces
+
+HF_HUB_DISABLE_XET=1 python - <<'PY'
+import socket
+
+orig_getaddrinfo = socket.getaddrinfo
+
+def ipv4_getaddrinfo(*args, **kwargs):
+    return [info for info in orig_getaddrinfo(*args, **kwargs) if info[0] == socket.AF_INET]
+
+socket.getaddrinfo = ipv4_getaddrinfo
+
+from huggingface_hub import snapshot_download
+
+path = snapshot_download("allenai/MolmoBot-SPOC-RBY1Rigid")
+print(path)
+PY
+```
+
+Successful download produced a cached snapshot similar to:
+
+```text
+/home/jinyoon/.cache/huggingface/hub/models--allenai--MolmoBot-SPOC-RBY1Rigid/snapshots/01d1c5334e241c739099c2a043c5b93f87ee7eff
+```
+
+Local patch:
+
+- `MolmoBot/MolmoBot-SPOC/eval/config/rby1_eval_config.py` now resolves the model with `snapshot_download(..., local_files_only=True)` first.
+- If the checkpoint is already cached, eval uses the local snapshot path without contacting Hugging Face.
+- If the checkpoint is missing, the config falls back to `snapshot_download(...)` with IPv4-only DNS resolution and `HF_HUB_DISABLE_XET=1`.
+
+The eval also downloads the SigLIP image/text encoder weights:
+
+```text
+timm/ViT-B-16-SigLIP-256
+```
+
+Those are cached under `~/.cache/huggingface/hub/` as well.
+
+## 10. Correct RBY1 Benchmark For MolmoBot-SPOC
+
+Do not use the older RBY1 pick benchmark path for SPOC eval:
+
+```text
+~/.cache/molmo-spaces-resources/benchmarks/molmospaces-bench-v1/20260408/procthor-objaverse/RBY1PickDataGenConfig/RBY1PickDataGenConfig_20260209_json_benchmark
+```
+
+That benchmark uses:
+
+```text
+camera_system_class: RBY1MjcfCameraSystem
+img_resolution: [640, 480]
+```
+
+MolmoBot-SPOC's RBY1 image preprocessor expects the GoPro-style camera setup. Use the benchmark-v2 RBY1 pick benchmark instead:
+
+```text
+~/.cache/molmo-spaces-resources/benchmarks/molmospaces-bench-v2/20260415/procthor-objaverse/rby1_benchmarks/pick_benchmark
+```
+
+Its metadata uses:
+
+```text
+camera_system_class: RBY1GoProD455CameraSystem
+num_episodes: 2000
+num_houses: 1715
+```
+
+Prepare the scene/object/grasp assets for the benchmark indices you want to test:
+
+```bash
+cd /home/jinyoon/workspace/live-robotics-lab-project/molmospaces
+conda activate mlspaces
+export PYTHONPATH="/home/jinyoon/workspace/live-robotics-lab-project/molmospaces:${PYTHONPATH}"
+
+python scripts/benchmarks/prepare_benchmark_assets.py \
+  --benchmark_dir /home/jinyoon/.cache/molmo-spaces-resources/benchmarks/molmospaces-bench-v2/20260415/procthor-objaverse/rby1_benchmarks/pick_benchmark \
+  --idx 0 1 2
+```
+
+What this does:
+
+- Reads the selected benchmark episode indices.
+- Resolves each episode's house scene XML.
+- Installs only the missing `objects/objaverse` and `grasps/droid_objaverse` packages for those scenes.
+- Skips packages that are already cached. It does not remove unrelated cached assets.
+
+Run one prepared episode with the MolmoBot-SPOC RBY1 rigid policy:
+
+```bash
+cd /home/jinyoon/workspace/live-robotics-lab-project/MolmoBot/MolmoBot-SPOC
+conda activate mlspaces
+
+export PYTHONPATH="/home/jinyoon/workspace/live-robotics-lab-project/molmospaces:${PYTHONPATH}"
+export MUJOCO_GL=egl
+export PYOPENGL_PLATFORM=egl
+export MUJOCO_EGL_DEVICE_ID=0
+export JAX_PLATFORMS=cpu
+
+python -m molmo_spaces.evaluation.eval_main \
+  molmobot_spoc.eval.config.rby1_eval_config:RBY1RigidManipEvalConfig \
+  --benchmark_dir /home/jinyoon/.cache/molmo-spaces-resources/benchmarks/molmospaces-bench-v2/20260415/procthor-objaverse/rby1_benchmarks/pick_benchmark \
+  --no_wandb \
+  --num_workers 1 \
+  --idx 2
+```
+
+Notes:
+
+- `--idx 0` runs only the first benchmark episode.
+- Change to `--idx 1`, `--idx 2`, etc. to run other fixed episodes.
+- Remove `--idx` only when intentionally running the full benchmark.
+- Default task length comes from the benchmark JSON. For the tested pick episodes, that was `task_horizon_sec=20`, which becomes `200` policy steps with `policy_dt_ms=100.0`.
+- To test whether a failure is horizon-limited, add an explicit override such as `--task_horizon_sec 40`.
+
+The benchmark may trigger extraction/checking for:
+
+```text
+objects/objaverse
+grasps/droid_objaverse
+```
+
+`droid_objaverse` is the grasp-data asset family for Objaverse objects. It does not mean the robot changed to DROID/Franka; the robot remains RBY1.
+

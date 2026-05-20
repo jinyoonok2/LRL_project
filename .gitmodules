@@ -1,0 +1,6 @@
+[submodule "molmospaces"]
+	path = molmospaces
+	url = https://github.com/jinyoonok2/molmospaces.git
+[submodule "MolmoBot"]
+	path = MolmoBot
+	url = https://github.com/jinyoonok2/MolmoBot.git
