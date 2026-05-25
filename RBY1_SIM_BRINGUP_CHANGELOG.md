@@ -35,6 +35,10 @@ Completed 1 houses, skipped 0 houses
 Success count: 0, Total count: 1
 ```
 
+- Ran additional RBY1 rigid pick episodes with the provided MolmoBot policy. The rollouts generated MP4/H5 outputs but did not satisfy the benchmark success metric.
+- Ran MolmoSpaces planner diagnostics on RBY1 pick episodes. The planner generated MP4/H5 outputs for `house_1001` and `house_1047`, but those also reported `success=False`.
+- Tried planner diagnostics for `pnp_benchmark`, `opening_benchmark`, and `door_opening_benchmark`. Those attempts did not produce successful generated rollouts in the current local setup.
+- Confirmed the local GPU is an 8 GB RTX 4060 Laptop GPU. Author-style CuRobo batch settings caused CUDA out-of-memory for several planner runs.
 - Ran `DoorOpeningDebugConfig` successfully:
 
 ```text
@@ -44,6 +48,25 @@ Success rate: 100.00%
 ```
 
 ## Code Changes
+
+The repository was cleaned after the evaluation pass. Temporary analysis/helper files were removed from the working tree and should not be treated as part of the maintained codebase:
+
+```text
+RBY1_EVALUATION_ANALYSIS.md
+render_rby1_ascii_diagrams.py
+run_rby1_curobo_benchmark_eval.py
+summarize_rby1_eval_outputs.py
+rby1_eval_episode_summary.csv
+rby1_pick_benchmark
+```
+
+Only the generated diagram PNGs are kept from the diagram work:
+
+```text
+rby1_diagram_images/diagram_01_molmospaces_benchmark_flow.png
+rby1_diagram_images/diagram_02_rby1_benchmark_episode_overview.png
+rby1_diagram_images/diagram_03_molmospace_to_molmobot_flow.png
+```
 
 ### `molmospaces/molmo_spaces/env/env.py`
 
@@ -333,4 +356,6 @@ Reason:
 - `experiment_output/` is ignored by git; deleting it removes only local generated run artifacts, not source-controlled repo files.
 - Keyboard teleop through `run_pipeline.py` is slow because it runs inside the full data-generation loop, including sensors, rendering, task checks, and recording logic.
 - `MolmoBot` is likely useful later for learned policy inference/training, but it does not directly solve MolmoSpaces keyboard teleop loop latency.
+- The next model-side checks are `allenai/MolmoBot-RBY1Multitask` and `allenai/MolmoBot-SPOC-RBY1Articulated`, once Hugging Face connectivity is stable.
+- The next planner-side check should use a larger GPU so author-style CuRobo batch settings can run without CUDA OOM.
 

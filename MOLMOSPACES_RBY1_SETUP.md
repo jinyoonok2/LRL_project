@@ -385,3 +385,27 @@ grasps/droid_objaverse
 
 `droid_objaverse` is the grasp-data asset family for Objaverse objects. It does not mean the robot changed to DROID/Franka; the robot remains RBY1.
 
+## 11. Current Evaluation Findings
+
+The current setup is able to launch RBY1 simulation, load benchmark-v2 pick episodes, run the provided MolmoBot rigid policy, and save MP4/H5 rollouts. However, the tested MolmoBot RBY1 rigid pick episodes were all marked unsuccessful by the benchmark success metric.
+
+The current generated results kept locally are:
+
+```text
+MolmoBot/MolmoBot-SPOC/eval_output/RBY1RigidManipEvalConfig/
+MolmoBot/MolmoBot-SPOC/eval_output/RBY1PlannerJsonEval/
+```
+
+Only output folders with generated MP4/H5 rollouts are kept. Failed attempts that produced only logs/configs were removed.
+
+Planner-based MolmoSpaces diagnostics are separate from MolmoBot model evaluation. They use MolmoSpaces planner policies such as CuRobo, not the learned MolmoBot checkpoint. The planner outputs are currently stored beside the MolmoBot outputs only for convenience. The pick planner generated saved rollouts for `house_1001` and `house_1047`, but those also failed the official benchmark success metric.
+
+Author-style CuRobo planner settings use more GPU memory than the local 8 GB RTX 4060 Laptop GPU can reliably provide. When using those settings locally, several planner runs hit CUDA out-of-memory. Use a larger GPU, ideally 16 GB VRAM or more, before drawing conclusions from author-style planner runs.
+
+## 12. Planned Follow-Up
+
+- Download and test `allenai/MolmoBot-RBY1Multitask` when Hugging Face connectivity is stable.
+- Download and test `allenai/MolmoBot-SPOC-RBY1Articulated` on `opening_benchmark`.
+- Re-run planner baselines on a larger GPU with author-style batch settings.
+- Keep the benchmark success metric unchanged when reporting results. If a planner visually grasps an object but reports `success=False`, treat that as a post-grasp/lift/success-condition issue rather than changing the metric.
+

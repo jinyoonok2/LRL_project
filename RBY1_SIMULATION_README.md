@@ -100,6 +100,24 @@ house_1016/
 
 `success=False` is not a setup error by itself. It means the episode ran but the policy did not satisfy the benchmark success condition before the horizon ended. A missing-asset/setup failure usually shows a skipped house or `Total count: 0`.
 
+## Current RBY1 Status
+
+The current local results are useful for diagnosis, but they are not successful benchmark completions.
+
+- The provided `allenai/MolmoBot-SPOC-RBY1Rigid` policy runs in the correct RBY1 pick benchmark environment and saves MP4/H5 rollouts, but the tested episodes were all marked `success=False`.
+- MolmoSpaces planner-based pick runs also generated MP4/H5 rollouts for `house_1001` and `house_1047`, but they were still marked failed by the official success metric. In `house_1001`, the planner logs show a grasp event, but the final pick success condition was not satisfied.
+- Planner attempts for `pnp_benchmark`, `opening_benchmark`, and `door_opening_benchmark` did not produce successful saved rollouts in the current local setup.
+- Matching the authors' planner batch settings more closely caused CUDA out-of-memory on the local 8 GB RTX 4060 Laptop GPU. A 16 GB VRAM server is a better target for author-style planner settings.
+
+The cleaned local result set keeps only generated rollouts with saved MP4/H5 files. Failed attempts that produced only logs/configs were removed.
+
+## Next Steps
+
+- Try the public RBY1 multitask checkpoint, `allenai/MolmoBot-RBY1Multitask`, once Hugging Face access is stable.
+- Try the articulated RBY1 checkpoint, `allenai/MolmoBot-SPOC-RBY1Articulated`, on `opening_benchmark`.
+- Re-run planner diagnostics on a larger GPU so author-style CuRobo batch sizes can be used without CUDA OOM.
+- If planner grasping visually succeeds but benchmark success remains false, inspect or tune the post-grasp/lift phase rather than loosening the benchmark success metric.
+
 ## Quick MolmoSpaces Debug Runs
 
 Scripted RBY1 door-opening debug with viewer:
