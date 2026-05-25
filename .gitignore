@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+
+# Local/generated analysis outputs.
+rby1_eval_episode_summary.csv
+rby1_pick_benchmark
+rby1_diagram_images/Untitled
+
+# Large local evaluation artifacts live inside the MolmoBot submodule.
+MolmoBot/MolmoBot-SPOC/eval_output/
