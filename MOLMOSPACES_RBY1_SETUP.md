@@ -251,13 +251,15 @@ Expected local paths should point into:
 
 ## 9. Hugging Face Model Download On This Ubuntu Setup
 
-The RBY1 rigid MolmoBot-SPOC checkpoint is:
+This machine had broken/slow IPv6 access to Hugging Face. `curl -4` worked, while `curl -6` timed out, and the normal `hf download ...` command could hang before creating the model cache folder. Use the IPv4-forced Python `snapshot_download(...)` method below for MolmoBot checkpoints instead of `hf download`.
 
-```text
-allenai/MolmoBot-SPOC-RBY1Rigid
+First verify IPv4 access:
+
+```bash
+curl -4 -I https://huggingface.co
 ```
 
-The repo was reachable without Hugging Face login, but this machine had broken/slow IPv6 access to Hugging Face. `curl -4` worked, while `curl -6` timed out. Force IPv4 for the Python model download:
+Then download checkpoints with IPv4-only DNS resolution:
 
 ```bash
 cd /home/jinyoon/workspace/live-robotics-lab-project/MolmoBot/MolmoBot-SPOC
@@ -265,25 +267,35 @@ conda activate mlspaces
 
 HF_HUB_DISABLE_XET=1 python - <<'PY'
 import socket
+from huggingface_hub import snapshot_download
 
 orig_getaddrinfo = socket.getaddrinfo
 
-def ipv4_getaddrinfo(*args, **kwargs):
-    return [info for info in orig_getaddrinfo(*args, **kwargs) if info[0] == socket.AF_INET]
+def ipv4_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+    return orig_getaddrinfo(host, port, socket.AF_INET, type, proto, flags)
 
 socket.getaddrinfo = ipv4_getaddrinfo
 
-from huggingface_hub import snapshot_download
+models = {
+    "rigid": "allenai/MolmoBot-SPOC-RBY1Rigid",
+    "articulated": "allenai/MolmoBot-SPOC-RBY1Articulated",
+    "multitask": "allenai/MolmoBot-RBY1Multitask",
+}
 
-path = snapshot_download("allenai/MolmoBot-SPOC-RBY1Rigid")
-print(path)
+for label, repo_id in models.items():
+    print(f"Downloading {label}: {repo_id}")
+    path = snapshot_download(
+        repo_id=repo_id,
+        local_dir=f"/home/jinyoon/workspace/hf_models/{repo_id.split('/')[-1]}",
+    )
+    print(path)
 PY
 ```
 
-Successful download produced a cached snapshot similar to:
+To download only one checkpoint, keep one entry in the `models` dictionary. The default Hugging Face cache also lives under:
 
 ```text
-/home/jinyoon/.cache/huggingface/hub/models--allenai--MolmoBot-SPOC-RBY1Rigid/snapshots/01d1c5334e241c739099c2a043c5b93f87ee7eff
+~/.cache/huggingface/hub
 ```
 
 Local patch:
@@ -385,7 +397,95 @@ grasps/droid_objaverse
 
 `droid_objaverse` is the grasp-data asset family for Objaverse objects. It does not mean the robot changed to DROID/Franka; the robot remains RBY1.
 
-## 11. Current Evaluation Findings
+## 11. MolmoBot RBY1 Multitask Eval
+
+The RBY1 rigid SPOC checkpoint is known to be weak for these tasks. For stronger RBY1 model-policy tests, use the multitask checkpoint:
+
+```text
+/home/jinyoon/workspace/hf_models/MolmoBot-RBY1Multitask
+```
+
+The multitask model can run directly through MolmoSpaces benchmark eval using configs in:
+
+```text
+MolmoBot/MolmoBot/olmo/eval/configure_molmo_spaces.py
+```
+
+Use:
+
+```text
+MolmoBotRBY1PickPnPEvalConfig
+```
+
+for `pick_benchmark` and `pnp_benchmark`, and:
+
+```text
+MolmoBotRBY1DoorPlusOpenEvalConfig
+```
+
+for opening/door tasks.
+
+Because `pip install -e ".[eval]"` previously failed on the old MolmoSpaces dependency URL, install the needed MolmoBot eval dependencies explicitly in the `mlspaces` environment:
+
+```bash
+cd /home/jinyoon/workspace/live-robotics-lab-project/MolmoBot/MolmoBot
+conda activate mlspaces
+
+pip install cached_path av hydra-core gcsfs==2023.9.2 accelerate sentencepiece google-cloud-storage
+```
+
+Then run a single pick episode:
+
+```bash
+cd /home/jinyoon/workspace/live-robotics-lab-project/MolmoBot/MolmoBot
+conda activate mlspaces
+
+export PYTHONPATH="/home/jinyoon/workspace/live-robotics-lab-project/MolmoBot/MolmoBot:/home/jinyoon/workspace/live-robotics-lab-project/molmospaces:${PYTHONPATH}"
+export MUJOCO_GL=egl
+export PYOPENGL_PLATFORM=egl
+export MUJOCO_EGL_DEVICE_ID=0
+export JAX_PLATFORMS=cpu
+
+python -m molmo_spaces.evaluation.eval_main \
+  olmo.eval.configure_molmo_spaces:MolmoBotRBY1PickPnPEvalConfig \
+  --benchmark_dir /home/jinyoon/.cache/molmo-spaces-resources/benchmarks/molmospaces-bench-v2/20260415/procthor-objaverse/rby1_benchmarks/pick_benchmark \
+  --checkpoint_path /home/jinyoon/workspace/hf_models/MolmoBot-RBY1Multitask \
+  --no_wandb \
+  --num_workers 1 \
+  --idx 0
+```
+
+For PnP, use the same eval config with the PnP benchmark:
+
+```bash
+python -m molmo_spaces.evaluation.eval_main \
+  olmo.eval.configure_molmo_spaces:MolmoBotRBY1PickPnPEvalConfig \
+  --benchmark_dir /home/jinyoon/.cache/molmo-spaces-resources/benchmarks/molmospaces-bench-v2/20260415/procthor-objaverse/rby1_benchmarks/pnp_benchmark \
+  --checkpoint_path /home/jinyoon/workspace/hf_models/MolmoBot-RBY1Multitask \
+  --no_wandb \
+  --num_workers 1 \
+  --idx 0
+```
+
+For opening tasks, use the door/open config:
+
+```bash
+python -m molmo_spaces.evaluation.eval_main \
+  olmo.eval.configure_molmo_spaces:MolmoBotRBY1DoorPlusOpenEvalConfig \
+  --benchmark_dir /home/jinyoon/.cache/molmo-spaces-resources/benchmarks/molmospaces-bench-v2/20260415/ithor/rby1_benchmarks/opening_benchmark \
+  --checkpoint_path /home/jinyoon/workspace/hf_models/MolmoBot-RBY1Multitask \
+  --no_wandb \
+  --num_workers 1 \
+  --idx 0
+```
+
+Notes:
+
+- `MolmoBot/MolmoBot/pyproject.toml` was patched to use modern direct URL syntax for the optional MolmoSpaces eval dependency.
+- `MolmoBot/MolmoBot/olmo/eval/configure_molmo_spaces.py` was patched so the RBY1 multitask eval config matches the current MolmoSpaces policy API and treats older optional policy fields as optional.
+- A local smoke test with `--idx 0` reached checkpoint config loading and model construction, then failed with CUDA OOM on the 8 GB RTX 4060 Laptop GPU. This means the code path is wired far enough to load the multitask model, but the local GPU is too small for this checkpoint. A larger GPU is preferred for serious benchmark runs.
+
+## 12. Current Evaluation Findings
 
 The current setup is able to launch RBY1 simulation, load benchmark-v2 pick episodes, run the provided MolmoBot rigid policy, and save MP4/H5 rollouts. However, the tested MolmoBot RBY1 rigid pick episodes were all marked unsuccessful by the benchmark success metric.
 
@@ -402,9 +502,9 @@ Planner-based MolmoSpaces diagnostics are separate from MolmoBot model evaluatio
 
 Author-style CuRobo planner settings use more GPU memory than the local 8 GB RTX 4060 Laptop GPU can reliably provide. When using those settings locally, several planner runs hit CUDA out-of-memory. Use a larger GPU, ideally 16 GB VRAM or more, before drawing conclusions from author-style planner runs.
 
-## 12. Planned Follow-Up
+## 13. Planned Follow-Up
 
-- Download and test `allenai/MolmoBot-RBY1Multitask` when Hugging Face connectivity is stable.
+- Test `allenai/MolmoBot-RBY1Multitask` on `pick_benchmark`, `pnp_benchmark`, and opening tasks using the direct MolmoSpaces eval configs above.
 - Download and test `allenai/MolmoBot-SPOC-RBY1Articulated` on `opening_benchmark`.
 - Re-run planner baselines on a larger GPU with author-style batch settings.
 - Keep the benchmark success metric unchanged when reporting results. If a planner visually grasps an object but reports `success=False`, treat that as a post-grasp/lift/success-condition issue rather than changing the metric.

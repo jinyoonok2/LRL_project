@@ -39,6 +39,13 @@ Success count: 0, Total count: 1
 - Ran MolmoSpaces planner diagnostics on RBY1 pick episodes. The planner generated MP4/H5 outputs for `house_1001` and `house_1047`, but those also reported `success=False`.
 - Tried planner diagnostics for `pnp_benchmark`, `opening_benchmark`, and `door_opening_benchmark`. Those attempts did not produce successful generated rollouts in the current local setup.
 - Confirmed the local GPU is an 8 GB RTX 4060 Laptop GPU. Author-style CuRobo batch settings caused CUDA out-of-memory for several planner runs.
+- Downloaded the RBY1 multitask MolmoBot checkpoint to:
+
+```text
+/home/jinyoon/workspace/hf_models/MolmoBot-RBY1Multitask
+```
+
+- Aligned the MolmoBot multitask benchmark eval path far enough to reach checkpoint config loading and model construction. The local run then failed with CUDA OOM on the 8 GB RTX 4060 Laptop GPU, confirming the next blocker is VRAM rather than the earlier dependency/config setup.
 - Ran `DoorOpeningDebugConfig` successfully:
 
 ```text
@@ -186,6 +193,55 @@ Reason:
 
 ```text
 TypeError: InferencePolicy.__init__() takes 2 positional arguments but 3 were given
+```
+
+### `MolmoBot/MolmoBot/olmo/eval/configure_molmo_spaces.py`
+
+Adjusted the direct MolmoSpaces eval wrapper for MolmoBot multitask RBY1 configs:
+
+- Current local MolmoSpaces `InferencePolicy.__init__` accepts only `config`, so the wrapper now calls `super().__init__(config)` and stores the task object separately as `self.task`.
+- `relative_max_joint_delta` is treated as optional for RBY1 multitask configs.
+- `states_mode` is treated as optional and defaults to `cross_attn`, matching the existing SynthVLA default.
+
+Reason:
+
+- `MolmoBotRBY1PickPnPEvalConfig` and `MolmoBotRBY1DoorPlusOpenEvalConfig` existed, but the local code path failed before model loading due to API/config mismatches.
+- After these fixes and dependency installation, the eval run reached:
+
+```text
+Loading config from /home/jinyoon/workspace/hf_models/MolmoBot-RBY1Multitask/config.yaml
+Model config: action_horizon=16, action_dim=20, n_obs_steps=1, flow_steps=10, States mode: cross_attn
+Building model...
+```
+
+Then the local machine failed with CUDA OOM:
+
+```text
+GPU 0 has a total capacity of 7.62 GiB
+CUDA out of memory
+```
+
+### `MolmoBot/MolmoBot/pyproject.toml`
+
+Updated the optional eval dependency for MolmoSpaces to use modern direct URL syntax:
+
+```text
+molmo-spaces[mujoco] @ git+https://github.com/allenai/molmospaces.git@cd23becebcf72dd93a4aa5872a60802d5eff03ef
+```
+
+Reason:
+
+- The old `#egg=molmo_spaces[mujoco]` fragment caused modern pip to fail with `invalid-egg-fragment`.
+- Until the full extra install path is used again, the needed MolmoBot eval dependencies were installed explicitly in `mlspaces`:
+
+```text
+cached_path
+av
+hydra-core
+gcsfs==2023.9.2
+accelerate
+sentencepiece
+google-cloud-storage
 ```
 
 ### `molmospaces/scripts/benchmarks/prepare_benchmark_assets.py`
@@ -356,6 +412,7 @@ Reason:
 - `experiment_output/` is ignored by git; deleting it removes only local generated run artifacts, not source-controlled repo files.
 - Keyboard teleop through `run_pipeline.py` is slow because it runs inside the full data-generation loop, including sensors, rendering, task checks, and recording logic.
 - `MolmoBot` is likely useful later for learned policy inference/training, but it does not directly solve MolmoSpaces keyboard teleop loop latency.
-- The next model-side checks are `allenai/MolmoBot-RBY1Multitask` and `allenai/MolmoBot-SPOC-RBY1Articulated`, once Hugging Face connectivity is stable.
+- `allenai/MolmoBot-RBY1Multitask` is downloaded and the direct benchmark eval path reaches model construction, but the local 8 GB GPU cannot load/run it. Re-run this path on a larger GPU.
+- The next model-side check still pending is `allenai/MolmoBot-SPOC-RBY1Articulated` for opening tasks.
 - The next planner-side check should use a larger GPU so author-style CuRobo batch settings can run without CUDA OOM.
 
