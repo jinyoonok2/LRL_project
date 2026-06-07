@@ -1,0 +1,57 @@
+name: rby1_eval
+description: Baseline 30-scenario run for all RBY1 benchmark families.
+
+paths:
+  project_root: /u/xna8aw/workspace/live-robotics-lab/LRL_project
+  cache_root: /u/xna8aw/workspace/live-robotics-lab/cache
+  model_root: /u/xna8aw/workspace/live-robotics-lab/hf_models
+  conda_env: /u/xna8aw/workspace/live-robotics-lab/envs/mlspaces
+  benchmark_version: "20260415"
+  benchmark_root: /u/xna8aw/workspace/live-robotics-lab/cache/molmo-spaces-resources/benchmarks/molmospaces-bench-v2/20260415
+  checkpoint: /u/xna8aw/workspace/live-robotics-lab/hf_models/MolmoBot-RBY1Multitask
+  output_base_dir: /u/xna8aw/workspace/live-robotics-lab/LRL_project/MolmoBot/MolmoBot/eval_output/baseline/rby1_eval
+
+tasks:
+  - pick
+  - pnp
+  - opening
+  - door_opening
+
+indices:
+  - 0
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+  - 6
+  - 7
+  - 8
+  - 9
+  - 25
+  - 75
+  - 125
+  - 175
+  - 225
+  - 275
+  - 325
+  - 375
+  - 425
+  - 475
+  - 525
+  - 575
+  - 625
+  - 675
+  - 725
+  - 775
+  - 825
+  - 875
+  - 925
+  - 975
+
+eval:
+  num_workers: 1
+  task_horizon_steps: null
+  terminate_upon_success: false
+
+policy_env: {}

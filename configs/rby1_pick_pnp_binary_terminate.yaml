@@ -1,0 +1,11 @@
+name: rby1_pick_pnp_binary_terminate
+description: Pick/PnP 10-episode binary gripper test with terminate-on-success enabled.
+
+extends: rby1_pick_pnp_binary.yaml
+
+paths:
+  output_base_dir: /u/xna8aw/workspace/live-robotics-lab/LRL_project/MolmoBot/MolmoBot/eval_output/experiments/rby1_pick_pnp_binary_terminate
+
+eval:
+  task_horizon_steps: null
+  terminate_upon_success: true
