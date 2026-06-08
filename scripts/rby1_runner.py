@@ -304,6 +304,36 @@ def run_subprocess(
         ).returncode
 
 
+def parse_benchmark_success(log_file: Path) -> tuple[str, str]:
+    """Extract benchmark success from a MolmoSpaces episode log.
+
+    The process exit code only tells us whether the evaluation command ran.
+    Benchmark success is reported inside the log, usually as either
+    `completed with success=True/False` or `house_x/ep0: pass/fail`.
+    """
+    if not log_file.is_file():
+        return "unknown", "missing_log"
+
+    text = log_file.read_text(errors="replace")
+    completed_matches = re.findall(r"completed with success=(True|False)", text)
+    if completed_matches:
+        value = completed_matches[-1] == "True"
+        return ("success" if value else "failed", "completed_with_success")
+
+    pass_fail_matches = re.findall(r"house_[^:\n]+/ep\d+:\s*(pass|fail)", text)
+    if pass_fail_matches:
+        value = pass_fail_matches[-1] == "pass"
+        return ("success" if value else "failed", "house_pass_fail")
+
+    count_matches = re.findall(r"Success count:\s*(\d+),\s*Total count:\s*(\d+)", text)
+    if count_matches:
+        success_count, total_count = (int(part) for part in count_matches[-1])
+        if total_count > 0:
+            return ("success" if success_count > 0 else "failed", "success_count")
+
+    return "unknown", "not_found"
+
+
 def run_prepare(config: dict[str, Any], args: argparse.Namespace) -> int:
     project_root = path_from(config, "project_root")
     molmospaces_root = project_root / "molmospaces"
@@ -409,8 +439,11 @@ def run_eval(config: dict[str, Any], args: argparse.Namespace) -> int:
         output_base_dir.mkdir(parents=True, exist_ok=True)
 
     rows: list[dict[str, str | int]] = []
-    success_count = 0
-    failure_count = 0
+    process_success_count = 0
+    process_failure_count = 0
+    benchmark_success_count = 0
+    benchmark_failure_count = 0
+    benchmark_unknown_count = 0
 
     for task in tasks:
         bench_dir = benchmark_dir(config, task)
@@ -474,36 +507,60 @@ def run_eval(config: dict[str, Any], args: argparse.Namespace) -> int:
                 dry_run=args.dry_run,
                 log_file=log_file,
             )
-            status = "success" if exit_code == 0 else "failed"
+            process_status = "success" if exit_code == 0 else "failed"
+            benchmark_success, benchmark_success_source = (
+                ("unknown", "dry_run")
+                if args.dry_run
+                else parse_benchmark_success(log_file)
+            )
             rows.append(
                 {
                     "task": task,
                     "idx": idx,
-                    "status": status,
+                    "process_status": process_status,
                     "exit_code": exit_code,
+                    "benchmark_success": benchmark_success,
+                    "benchmark_success_source": benchmark_success_source,
                     "log_file": str(log_file),
                 }
             )
             if exit_code == 0:
-                success_count += 1
+                process_success_count += 1
             else:
-                failure_count += 1
+                process_failure_count += 1
+            if benchmark_success == "success":
+                benchmark_success_count += 1
+            elif benchmark_success == "failed":
+                benchmark_failure_count += 1
+            else:
+                benchmark_unknown_count += 1
 
     if not args.dry_run:
         with summary_file.open("w", newline="") as f:
             writer = csv.DictWriter(
                 f,
-                fieldnames=["task", "idx", "status", "exit_code", "log_file"],
+                fieldnames=[
+                    "task",
+                    "idx",
+                    "process_status",
+                    "exit_code",
+                    "benchmark_success",
+                    "benchmark_success_source",
+                    "log_file",
+                ],
                 delimiter="\t",
             )
             writer.writeheader()
             writer.writerows(rows)
 
     print("RBY1 multitask eval complete.")
-    print(f"Successes: {success_count}")
-    print(f"Failures: {failure_count}")
+    print(f"Process successes: {process_success_count}")
+    print(f"Process failures: {process_failure_count}")
+    print(f"Benchmark successes: {benchmark_success_count}")
+    print(f"Benchmark failures: {benchmark_failure_count}")
+    print(f"Benchmark unknown: {benchmark_unknown_count}")
     print(f"Summary: {summary_file}")
-    return 1 if failure_count else 0
+    return 1 if process_failure_count else 0
 
 
 def main() -> None:
