@@ -1,182 +1,8 @@
-# RBY1 Simulation And Evaluation Project
-
-This repository is the working project for bringing up RBY1 simulation with
-MolmoSpaces and running MolmoBot evaluation workflows.
-
-The project combines two upstream codebases as submodules:
-
-- `molmospaces`: simulation, benchmark assets, scenes, robots, cameras, and evaluation runtime
-- `MolmoBot`: learned policy code and model evaluation entry points
-
-The current focus is reproducible RBY1 simulation/evaluation, including asset
-preparation, benchmark episode execution, saved rollout videos, and debugging of
-Pick/PnP performance.
-
-## Repository Layout
-
-```text
-LRL_project/
-  MolmoBot/                  # MolmoBot submodule
-  molmospaces/               # MolmoSpaces submodule
-  rby1_diagram_images/       # RBY1 benchmark/evaluation diagrams
-  MOLMOSPACES_RBY1_SETUP.md  # environment and dependency setup notes
-  RBY1_SIM_BRINGUP_CHANGELOG.md
-```
-
-## Branches
-
-The intended branch split is:
-
-- `main`: clean simulation bringup baseline and documentation
-- `rby1-custom`: active RBY1 evaluation workflow, configs, and experiment scripts
-
-Use `rby1-custom` for the latest multitask evaluation workflow. Use `main` as a
-clean reference branch.
-
-## Setup
-
-Start with the setup guide:
-
-```text
-MOLMOSPACES_RBY1_SETUP.md
-```
-
-That file documents the Conda environment, CUDA/cuRobo dependencies,
-MolmoSpaces assets, MolmoBot-SPOC setup, and common troubleshooting steps.
-
-After cloning, initialize submodules:
-
-```bash
-git submodule update --init --recursive
-```
-
-## What Runs Here
-
-There are two related RBY1 workflows:
-
-- MolmoSpaces debug/data-generation configs run scripted or planner-based
-  policies in simulation.
-- MolmoBot evaluation runs a learned policy checkpoint while using MolmoSpaces
-  for the simulator, RBY1 robot, scenes, cameras, benchmark episodes, and saved
-  video/data output.
-
-For the original RBY1 rigid MolmoBot-SPOC workflow:
-
-```text
-Model: allenai/MolmoBot-SPOC-RBY1Rigid
-Benchmark: molmospaces-bench-v2/.../rby1_benchmarks/pick_benchmark
-Config: molmobot_spoc.eval.config.rby1_eval_config:RBY1RigidManipEvalConfig
-```
-
-Do not use the older benchmark-v1 RBY1 pick path for this model. It uses the
-wrong camera setup for the RBY1 rigid checkpoint.
-
-## Prepare Benchmark Assets
-
-Before running fixed benchmark episodes, prepare the scene/object/grasp assets
-for those indices. This avoids missing Objaverse mesh errors during evaluation
-without downloading the full Objaverse asset set.
-
-```bash
-cd molmospaces
-conda activate mlspaces
-
-export PYTHONPATH="$PWD:${PYTHONPATH}"
-
-python scripts/benchmarks/prepare_benchmark_assets.py \
-  --benchmark_dir ~/.cache/molmo-spaces-resources/benchmarks/molmospaces-bench-v2/20260415/procthor-objaverse/rby1_benchmarks/pick_benchmark \
-  --idx 0 1 2
-```
-
-The cache is additive. Cancelling after an index finishes does not remove assets
-that were already extracted.
-
-## Run MolmoBot-SPOC RBY1 Eval
-
-Run one prepared benchmark episode:
-
-```bash
-cd MolmoBot/MolmoBot-SPOC
-conda activate mlspaces
-
-export PYTHONPATH="../../molmospaces:${PYTHONPATH}"
-export MUJOCO_GL=egl
-export PYOPENGL_PLATFORM=egl
-export MUJOCO_EGL_DEVICE_ID=0
-export JAX_PLATFORMS=cpu
-
-python -m molmo_spaces.evaluation.eval_main \
-  molmobot_spoc.eval.config.rby1_eval_config:RBY1RigidManipEvalConfig \
-  --benchmark_dir ~/.cache/molmo-spaces-resources/benchmarks/molmospaces-bench-v2/20260415/procthor-objaverse/rby1_benchmarks/pick_benchmark \
-  --no_wandb \
-  --num_workers 1 \
-  --idx 2
-```
-
-Change `--idx 2` to another prepared episode index. Remove `--idx` only when
-intentionally running the full benchmark.
-
-## Outputs
-
-MolmoBot-SPOC evaluation writes outputs under:
-
-```text
-MolmoBot/MolmoBot-SPOC/eval_output/RBY1RigidManipEvalConfig/<timestamp>/
-```
-
-Useful artifacts include per-house saved trajectories and camera videos.
-
-`success=False` is not a setup error by itself. It means the episode ran but the
-policy did not satisfy the benchmark success condition before the horizon ended.
-A missing-asset/setup failure usually shows a skipped house or `Total count: 0`.
-
-## Quick MolmoSpaces Debug Runs
-
-Scripted RBY1 door-opening debug with viewer:
-
-```bash
-cd molmospaces
-conda activate mlspaces
-
-export PYTHONPATH="$PWD:${PYTHONPATH}"
-export MUJOCO_GL=egl
-export PYOPENGL_PLATFORM=egl
-export MUJOCO_EGL_DEVICE_ID=0
-export JAX_PLATFORMS=cpu
-
-python -m molmo_spaces.data_generation.main DoorOpeningDebugConfig
-```
-
-Headless door-opening debug:
-
-```bash
-python -m molmo_spaces.data_generation.main DoorOpeningNoViewerDebugConfig
-```
-
-Fast teleop sandbox:
-
-```bash
-python scripts/datagen/run_fast_teleop.py
-```
-
-These are MolmoSpaces scripted/debug workflows, not learned-policy MolmoBot
-evaluation runs.
-
-## Notes
-
-The detailed bringup history is kept in:
-
-```text
-RBY1_SIM_BRINGUP_CHANGELOG.md
-```
-
-For the latest YAML-based RBY1 multitask evaluation workflow, switch to the
-`rby1-custom` branch.
 # Live Robotics Lab RBY1 Evaluation Project
 
 This repository is the working RBY1 MolmoBot/MolmoSpaces evaluation workspace.
-It keeps a clean `main` branch and an active `rby1-custom` branch for RBY1
-multitask evaluation fixes, scripts, configs, and experiment results.
+The `main` branch is the current project branch for RBY1 multitask evaluation
+fixes, scripts, configs, and experiment results.
 
 For machine setup, Conda/CUDA setup, assets, and Slurm usage, see:
 
@@ -199,15 +25,15 @@ LRL_project/
     experiments/            # Parameter sweep outputs
 ```
 
-## Active Branches
+## Branch
 
-Use these branches for current work:
+Use this branch for current work:
 
-- `main`: clean/original-style branch
-- `rby1-custom`: active development/evaluation branch
+- `main`: active RBY1 evaluation branch
 
 Old branch names such as `uva-cs-server`, `rby1-sim-bringup`, and
-`rby1-policy-eval` are no longer part of the intended workflow.
+`rby1-policy-eval` are no longer part of the intended workflow. The previous
+`rby1-custom` branch content has been promoted into `main`.
 
 ## Current Workflow
 

@@ -1,0 +1,33 @@
+name: rby1_pick_pnp_binary_threshold_neg05
+description: Pick/PnP 10-episode binary gripper test with threshold -0.5.
+
+extends: rby1_eval.yaml
+
+paths:
+  output_base_dir: /u/xna8aw/workspace/live-robotics-lab/LRL_project/MolmoBot/MolmoBot/eval_output/experiments/rby1_pick_pnp_binary_threshold_neg05
+
+tasks:
+  - pick
+  - pnp
+
+indices:
+  - 10
+  - 21
+  - 33
+  - 56
+  - 58
+  - 74
+  - 99
+  - 101
+  - 123
+  - 137
+
+eval:
+  task_horizon_steps: null
+  terminate_upon_success: false
+
+policy_env:
+  RBY1_GRIPPER_OUTPUT_MODE: binary_rby1
+  RBY1_GRIPPER_BINARY_THRESHOLD: "-0.5"
+  RBY1_GRIPPER_OPEN_POSITION: "-0.05"
+  RBY1_GRIPPER_CLOSED_POSITION: "0.0"
