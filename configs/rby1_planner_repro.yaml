@@ -1,0 +1,30 @@
+name: rby1_planner_repro
+description: Repeated planner evaluation for checking RBY1 trajectory reproducibility.
+
+paths:
+  project_root: /u/xna8aw/workspace/live-robotics-lab/LRL_project
+  cache_root: /u/xna8aw/workspace/live-robotics-lab/cache
+  benchmark_version: "20260415"
+  benchmark_root: /u/xna8aw/workspace/live-robotics-lab/cache/molmo-spaces-resources/benchmarks/molmospaces-bench-v2/20260415
+  output_base_dir: /u/xna8aw/workspace/live-robotics-lab/LRL_project/MolmoBot/MolmoBot/eval_output/planner_repro/rby1_planner_repro
+
+# Start with one frozen episode. Override from the CLI with:
+#   --tasks pick,pnp --indices 0,10
+tasks:
+  - pick
+
+indices:
+  - 0
+
+eval:
+  num_workers: 1
+  repeats: 3
+  seed: 42
+  task_horizon_steps: 400
+  terminate_upon_success: true
+  save_partial_trajectories_on_exception: true
+
+planner_env:
+  # "local" clears planner server_urls so pick/pnp instantiate CuroboPlanner
+  # inside this Slurm job instead of using the remote gRPC planner server.
+  RBY1_CUROBO_SERVER_URLS: local

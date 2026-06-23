@@ -24,7 +24,7 @@ indices:
 
 eval:
   task_horizon_steps: 450
-  terminate_upon_success: false
+  terminate_upon_success: true
 
 policy_env:
   RBY1_GRIPPER_OUTPUT_MODE: binary_rby1_inverted

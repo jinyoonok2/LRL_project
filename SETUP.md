@@ -259,7 +259,6 @@ Baseline outputs:
 ```text
 MolmoBot/MolmoBot/eval_output/baseline/
   rby1_eval/
-  rby1_pick_pnp_expansion/
 ```
 
 Experiment outputs:

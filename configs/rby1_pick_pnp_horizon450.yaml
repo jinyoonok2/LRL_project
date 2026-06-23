@@ -24,5 +24,6 @@ indices:
 
 eval:
   task_horizon_steps: 450
+  terminate_upon_success: true
 
 policy_env: {}

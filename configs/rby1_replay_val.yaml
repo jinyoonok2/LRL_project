@@ -1,0 +1,22 @@
+name: rby1_replay_val
+description: Replay downloaded MolmoBot-data RBY1 validation trajectories.
+
+paths:
+  project_root: /u/xna8aw/workspace/live-robotics-lab/LRL_project
+  cache_root: /u/xna8aw/workspace/live-robotics-lab/cache
+  conda_env: /u/xna8aw/workspace/live-robotics-lab/envs/mlspaces
+  data_root: /bigtemp/xna8aw/LRL/molmobot-data
+  benchmark_root: /bigtemp/xna8aw/LRL/molmobot-data/replay_benchmarks
+  output_base_dir: /bigtemp/xna8aw/LRL/molmobot-data/replay_output/rby1_replay_val
+
+configs:
+  - RBY1PickDataGenConfig
+  - RBY1PickAndPlaceDataGenConfig
+  - RBY1OpenDataGenConfig
+
+eval:
+  num_workers: 1
+  repeats: 1
+  max_episodes_per_config: 3
+  task_horizon_steps: null
+  terminate_upon_success: false

@@ -61,8 +61,7 @@ The old Bash orchestration scripts were removed. The main logic now lives in
 
 Baseline configs:
 
-- `configs/rby1_eval.yaml`: 30 selected indices across `pick`, `pnp`, `opening`, and `door_opening`
-- `configs/rby1_pick_pnp_expansion.yaml`: larger Pick/PnP expansion set
+- `configs/rby1_eval.yaml`: 100 indices across `pick`, `pnp`, `opening`, and `door_opening`
 
 Experiment configs:
 
@@ -130,7 +129,6 @@ Baseline results:
 ```text
 MolmoBot/MolmoBot/eval_output/baseline/
   rby1_eval/
-  rby1_pick_pnp_expansion/
 ```
 
 Experiment results:

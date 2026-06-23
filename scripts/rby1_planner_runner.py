@@ -1,12 +1,23 @@
 #!/usr/bin/env python3
-"""Python orchestration for RBY1 MolmoBot benchmark preparation and evaluation."""
+"""Run RBY1 MolmoSpaces planner policies on JSON benchmarks.
+
+This mirrors scripts/rby1_runner.py, but intentionally avoids MolmoBot-specific
+checkpoint/model assumptions. It is meant for reproducibility checks such as:
+
+    same benchmark episode + same planner + same seed + N repeats
+
+The runner saves one log per task/index/repeat and hashes any generated HDF5
+trajectory files so repeated runs can be compared quickly.
+"""
 
 from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import os
+import random
 import re
 import subprocess
 import sys
@@ -21,35 +32,40 @@ import yaml
 TASKS: dict[str, dict[str, str]] = {
     "pick": {
         "benchmark_rel": "procthor-objaverse/rby1_benchmarks/pick_benchmark",
-        "eval_config_cls": "olmo.eval.configure_molmo_spaces:MolmoBotRBY1PickPnPEvalConfig",
+        "eval_config_cls": (
+            "molmo_spaces.data_generation.config.object_manipulation_datagen_configs:"
+            "RBY1PickDataGenConfig"
+        ),
     },
     "pnp": {
         "benchmark_rel": "procthor-objaverse/rby1_benchmarks/pnp_benchmark",
-        "eval_config_cls": "olmo.eval.configure_molmo_spaces:MolmoBotRBY1PickPnPEvalConfig",
+        "eval_config_cls": (
+            "molmo_spaces.data_generation.config.object_manipulation_datagen_configs:"
+            "RBY1PickAndPlaceDataGenConfig"
+        ),
     },
     "opening": {
         "benchmark_rel": "ithor/rby1_benchmarks/opening_benchmark",
-        "eval_config_cls": "olmo.eval.configure_molmo_spaces:MolmoBotRBY1DoorPlusOpenEvalConfig",
+        "eval_config_cls": (
+            "molmo_spaces.data_generation.config.object_manipulation_datagen_configs:"
+            "RBY1OpenDataGenConfig"
+        ),
     },
     "door_opening": {
         "benchmark_rel": "procthor-10k/rby1_benchmarks/door_opening_benchmark",
-        "eval_config_cls": "olmo.eval.configure_molmo_spaces:MolmoBotRBY1DoorPlusOpenEvalConfig",
+        "eval_config_cls": (
+            "molmo_spaces.data_generation.config.door_opening_configs:"
+            "DoorOpeningDataGenConfig"
+        ),
     },
 }
-
-KNOWN_POLICY_ENV = (
-    "RBY1_GRIPPER_OUTPUT_MODE",
-    "RBY1_GRIPPER_BINARY_THRESHOLD",
-    "RBY1_GRIPPER_OPEN_POSITION",
-    "RBY1_GRIPPER_CLOSED_POSITION",
-)
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    for command in ("describe", "prepare", "eval"):
+    for command in ("describe", "eval"):
         subparser = subparsers.add_parser(command)
         subparser.add_argument("--config", type=Path, required=True)
         subparser.add_argument(
@@ -58,16 +74,15 @@ def parse_args() -> argparse.Namespace:
         )
         subparser.add_argument(
             "--indices",
-            help="Comma-separated index override, e.g. 10,21. Defaults to config indices.",
+            help="Comma-separated index override, e.g. 0,10. Defaults to config indices.",
         )
-        if command in {"prepare", "eval"}:
-            subparser.add_argument(
-                "--dry-run",
-                action="store_true",
-                help="Print commands without running them.",
-            )
 
     eval_parser = subparsers.choices["eval"]
+    eval_parser.add_argument(
+        "--repeats",
+        type=int,
+        help="Override number of repeats per task/index.",
+    )
     eval_parser.add_argument(
         "--run-id",
         help="Run folder/log suffix. Defaults to timestamp plus Slurm job id or PID.",
@@ -78,10 +93,24 @@ def parse_args() -> argparse.Namespace:
         help="Override config output_base_dir.",
     )
     eval_parser.add_argument(
-        "--repeats",
-        type=int,
-        help="Override number of repeats per task/index.",
+        "--dry-run",
+        action="store_true",
+        help="Print commands without running them.",
     )
+
+    # Internal worker command. The public entry point is "eval"; this keeps each
+    # repeat in a fresh Python process so global planner/simulator state cannot
+    # leak across trials.
+    run_one = subparsers.add_parser("run-one")
+    run_one.add_argument("--eval-config-cls", required=True)
+    run_one.add_argument("--benchmark-dir", type=Path, required=True)
+    run_one.add_argument("--output-dir", type=Path, required=True)
+    run_one.add_argument("--idx", type=int, required=True)
+    run_one.add_argument("--num-workers", type=int, default=1)
+    run_one.add_argument("--seed", type=int, default=42)
+    run_one.add_argument("--task-horizon-steps", type=int)
+    run_one.add_argument("--terminate-upon-success", action="store_true")
+    run_one.add_argument("--save-partial-trajectories-on-exception", action="store_true")
 
     return parser.parse_args()
 
@@ -129,16 +158,16 @@ def path_from(config: dict[str, Any], key: str) -> Path:
 def selected_tasks_and_indices(
     config: dict[str, Any], args: argparse.Namespace
 ) -> tuple[list[str], list[int]]:
-    if args.tasks:
+    if getattr(args, "tasks", None):
         tasks = [task.strip() for task in args.tasks.split(",") if task.strip()]
     else:
         tasks = list(config.get("tasks") or [])
 
     unknown = [task for task in tasks if task not in TASKS]
     if unknown:
-        raise SystemExit(f"Unknown RBY1 tasks: {unknown}")
+        raise SystemExit(f"Unknown RBY1 planner tasks: {unknown}")
 
-    if args.indices:
+    if getattr(args, "indices", None):
         indices = [int(idx.strip()) for idx in args.indices.split(",") if idx.strip()]
     else:
         indices = [int(idx) for idx in (config.get("indices") or [])]
@@ -170,18 +199,20 @@ def setup_runtime_env(config: dict[str, Any]) -> dict[str, str]:
     env.setdefault("MUJOCO_EGL_DEVICE_ID", "0")
     env.setdefault("JAX_PLATFORMS", "cpu")
     env.setdefault("HF_HUB_DISABLE_XET", "1")
+    env.setdefault("PYTHONUNBUFFERED", "1")
 
-    pythonpath_parts = [
-        str(project_root / "MolmoBot/MolmoBot"),
-        str(project_root / "molmospaces"),
-    ]
+    # Determinism helpers. These do not guarantee deterministic MuJoCo/curobo
+    # behavior, but they remove avoidable Python/CUDA sources of variation.
+    seed = int((config.get("eval") or {}).get("seed", 42))
+    env.setdefault("PYTHONHASHSEED", str(seed))
+    env.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
+
+    pythonpath_parts = [str(project_root / "molmospaces")]
     if env.get("PYTHONPATH"):
         pythonpath_parts.append(env["PYTHONPATH"])
     env["PYTHONPATH"] = ":".join(pythonpath_parts)
 
-    for key in KNOWN_POLICY_ENV:
-        env.pop(key, None)
-    for key, value in (config.get("policy_env") or {}).items():
+    for key, value in (config.get("planner_env") or {}).items():
         env[str(key)] = str(value)
 
     for key in (
@@ -194,9 +225,8 @@ def setup_runtime_env(config: dict[str, Any]) -> dict[str, str]:
     ):
         Path(env[key]).mkdir(parents=True, exist_ok=True)
 
-    # Preserve optional path declarations for downstream debugging.
     for key, value in paths.items():
-        env[f"RBY1_CONFIG_PATH_{key.upper()}"] = str(value)
+        env[f"RBY1_PLANNER_PATH_{key.upper()}"] = str(value)
 
     return env
 
@@ -219,7 +249,6 @@ def episode_metadata(benchmark_json: Path, idx: int) -> dict[str, Any]:
     language = episode.get("language", {})
     task = episode.get("task", {})
     referrals = language.get("referral_expressions", {})
-
     task_description = (
         language.get("task_description") or task.get("task_type") or "unknown_task"
     )
@@ -231,7 +260,6 @@ def episode_metadata(benchmark_json: Path, idx: int) -> dict[str, Any]:
         or task.get("door_body_name")
         or "unknown_object"
     )
-
     return {
         "task_description": task_description,
         "object_label": object_label,
@@ -256,34 +284,28 @@ def num_workers(config: dict[str, Any]) -> int:
     return int((config.get("eval") or {}).get("num_workers", 1))
 
 
-def terminate_upon_success(config: dict[str, Any]) -> bool:
-    return bool((config.get("eval") or {}).get("terminate_upon_success", False))
+def seed(config: dict[str, Any]) -> int:
+    return int((config.get("eval") or {}).get("seed", 42))
 
 
 def repeats(config: dict[str, Any], args: argparse.Namespace) -> int:
-    value = (
-        args.repeats
-        if args.repeats is not None
-        else (config.get("eval") or {}).get("repeats", 1)
-    )
+    value = args.repeats if args.repeats is not None else (config.get("eval") or {}).get("repeats", 1)
     value = int(value)
     if value < 1:
         raise SystemExit("repeats must be >= 1")
     return value
 
 
+def terminate_upon_success(config: dict[str, Any]) -> bool:
+    return bool((config.get("eval") or {}).get("terminate_upon_success", False))
+
+
 def describe_config(config: dict[str, Any], args: argparse.Namespace) -> None:
     tasks, indices = selected_tasks_and_indices(config, args)
-    policy_env = config.get("policy_env") or {}
-    repeat_count = (
-        repeats(config, args)
-        if args.command == "eval"
-        else int((config.get("eval") or {}).get("repeats", 1))
-    )
+    repeat_count = repeats(config, args) if args.command == "eval" else int((config.get("eval") or {}).get("repeats", 1))
     print(f"name={config.get('name', args.config.stem)}")
     print(f"project_root={path_from(config, 'project_root')}")
     print(f"benchmark_root={path_from(config, 'benchmark_root')}")
-    print(f"checkpoint={path_from(config, 'checkpoint')}")
     print(f"output_base_dir={path_from(config, 'output_base_dir')}")
     print(f"tasks={' '.join(tasks)}")
     print(f"indices={' '.join(str(idx) for idx in indices)}")
@@ -291,8 +313,18 @@ def describe_config(config: dict[str, Any], args: argparse.Namespace) -> None:
     print(f"run_count={len(tasks) * len(indices) * repeat_count}")
     print(f"task_horizon_steps={task_horizon(config) or 'benchmark_default'}")
     print(f"num_workers={num_workers(config)}")
+    print(f"seed={seed(config)}")
     print(f"terminate_upon_success={terminate_upon_success(config)}")
-    print(f"policy_env={json.dumps(policy_env, sort_keys=True)}")
+    print(f"planner_env={json.dumps(config.get('planner_env') or {}, sort_keys=True)}")
+    for task in tasks:
+        print(f"planner_config[{task}]={TASKS[task]['eval_config_cls']}")
+
+
+def make_run_id(args: argparse.Namespace) -> str:
+    if args.run_id:
+        return args.run_id
+    suffix = os.environ.get("SLURM_JOB_ID") or str(os.getpid())
+    return f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{suffix}"
 
 
 def run_subprocess(
@@ -301,16 +333,14 @@ def run_subprocess(
     cwd: Path,
     env: dict[str, str],
     dry_run: bool,
-    log_file: Path | None = None,
+    log_file: Path,
 ) -> int:
     printable = " ".join(str(part) for part in command)
     if dry_run:
         print(f"[dry-run] cwd={cwd}")
         print(f"[dry-run] {printable}")
+        print(f"[dry-run] log={log_file}")
         return 0
-
-    if log_file is None:
-        return subprocess.run(command, cwd=cwd, env=env, check=False).returncode
 
     log_file.parent.mkdir(parents=True, exist_ok=True)
     with log_file.open("w") as f:
@@ -328,12 +358,6 @@ def run_subprocess(
 
 
 def parse_benchmark_success(log_file: Path) -> tuple[str, str]:
-    """Extract benchmark success from a MolmoSpaces episode log.
-
-    The process exit code only tells us whether the evaluation command ran.
-    Benchmark success is reported inside the log, usually as either
-    `completed with success=True/False` or `house_x/ep0: pass/fail`.
-    """
     if not log_file.is_file():
         return "unknown", "missing_log"
 
@@ -348,6 +372,10 @@ def parse_benchmark_success(log_file: Path) -> tuple[str, str]:
         value = pass_fail_matches[-1] == "pass"
         return ("success" if value else "failed", "house_pass_fail")
 
+    rate_matches = re.findall(r"Success rate:\s*([0-9.]+)%", text)
+    if rate_matches:
+        return ("success" if float(rate_matches[-1]) > 0.0 else "failed", "success_rate")
+
     count_matches = re.findall(r"Success count:\s*(\d+),\s*Total count:\s*(\d+)", text)
     if count_matches:
         success_count, total_count = (int(part) for part in count_matches[-1])
@@ -357,53 +385,31 @@ def parse_benchmark_success(log_file: Path) -> tuple[str, str]:
     return "unknown", "not_found"
 
 
-def run_prepare(config: dict[str, Any], args: argparse.Namespace) -> int:
-    project_root = path_from(config, "project_root")
-    molmospaces_root = project_root / "molmospaces"
-    env = setup_runtime_env(config)
-    tasks, indices = selected_tasks_and_indices(config, args)
+def hash_h5_outputs(output_root: Path) -> str:
+    h5_files = sorted(output_root.glob("**/trajectories*.h5"))
+    if not h5_files:
+        return ""
 
-    describe_config(config, args)
-    constants_cmd = [sys.executable, "-m", "molmo_spaces.molmo_spaces_constants"]
-    exit_code = run_subprocess(
-        constants_cmd,
-        cwd=molmospaces_root,
-        env=env,
-        dry_run=args.dry_run,
-    )
-    if exit_code != 0:
-        return exit_code
+    import h5py
 
-    for task in tasks:
-        bench_dir = benchmark_dir(config, task)
-        benchmark_json = bench_dir / "benchmark.json"
-        if not args.dry_run and not benchmark_json.is_file():
-            raise SystemExit(f"Missing benchmark.json: {bench_dir}")
-        cmd = [
-            sys.executable,
-            "scripts/benchmarks/prepare_benchmark_assets.py",
-            "--benchmark_dir",
-            str(bench_dir),
-            "--idx",
-            *[str(idx) for idx in indices],
-        ]
-        exit_code = run_subprocess(
-            cmd,
-            cwd=molmospaces_root,
-            env=env,
-            dry_run=args.dry_run,
-        )
-        if exit_code != 0:
-            return exit_code
+    digest = hashlib.sha256()
+    for h5_path in h5_files:
+        digest.update(str(h5_path.relative_to(output_root)).encode())
+        with h5py.File(h5_path, "r") as f:
+            def visit(name: str, obj: Any) -> None:
+                if not hasattr(obj, "shape"):
+                    return
+                digest.update(name.encode())
+                digest.update(str(obj.shape).encode())
+                digest.update(str(obj.dtype).encode())
+                value = obj[()]
+                try:
+                    digest.update(value.tobytes())
+                except Exception:
+                    digest.update(repr(value).encode(errors="replace"))
 
-    return 0
-
-
-def make_run_id(args: argparse.Namespace) -> str:
-    if getattr(args, "run_id", None):
-        return args.run_id
-    suffix = os.environ.get("SLURM_JOB_ID") or str(os.getpid())
-    return f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{suffix}"
+            f.visititems(visit)
+    return digest.hexdigest()
 
 
 def write_run_info(
@@ -414,7 +420,7 @@ def write_run_info(
     idx: int,
     repeat: int,
     bench_dir: Path,
-    checkpoint: Path,
+    eval_config_cls: str,
 ) -> Path:
     output_root.mkdir(parents=True, exist_ok=True)
     metadata = dict(metadata)
@@ -424,7 +430,7 @@ def write_run_info(
             "idx": idx,
             "repeat": repeat,
             "benchmark_dir": str(bench_dir),
-            "checkpoint": str(checkpoint),
+            "eval_config_cls": eval_config_cls,
             "output_root": str(output_root),
         }
     )
@@ -435,29 +441,21 @@ def write_run_info(
 
 def run_eval(config: dict[str, Any], args: argparse.Namespace) -> int:
     project_root = path_from(config, "project_root")
-    checkpoint = path_from(config, "checkpoint")
-    molmobot_root = project_root / "MolmoBot/MolmoBot"
+    molmospaces_root = project_root / "molmospaces"
     env = setup_runtime_env(config)
     tasks, indices = selected_tasks_and_indices(config, args)
     repeat_count = repeats(config, args)
 
-    if not args.dry_run:
-        if not (checkpoint / "model.pt").is_file():
-            raise SystemExit(f"Missing checkpoint weights: {checkpoint / 'model.pt'}")
-        if not (checkpoint / "config.yaml").is_file():
-            raise SystemExit(f"Missing checkpoint config: {checkpoint / 'config.yaml'}")
-
     run_id = make_run_id(args)
     base_output = args.output_base_dir or path_from(config, "output_base_dir")
     output_base_dir = base_output / run_id
-    log_dir = project_root / "logs" / f"rby1_multitask_{run_id}"
+    log_dir = project_root / "logs" / f"rby1_planner_{run_id}"
     summary_file = log_dir / "summary.tsv"
 
     describe_config(config, args)
     print(f"run_id={run_id}")
     print(f"log_dir={log_dir}")
     print(f"output_base_dir={output_base_dir}")
-
     if args.dry_run:
         print(f"[dry-run] summary={summary_file}")
     else:
@@ -465,11 +463,7 @@ def run_eval(config: dict[str, Any], args: argparse.Namespace) -> int:
         output_base_dir.mkdir(parents=True, exist_ok=True)
 
     rows: list[dict[str, str | int]] = []
-    process_success_count = 0
     process_failure_count = 0
-    benchmark_success_count = 0
-    benchmark_failure_count = 0
-    benchmark_unknown_count = 0
 
     for task in tasks:
         bench_dir = benchmark_dir(config, task)
@@ -477,24 +471,22 @@ def run_eval(config: dict[str, Any], args: argparse.Namespace) -> int:
         if not args.dry_run and not benchmark_json.is_file():
             raise SystemExit(f"Missing benchmark.json: {bench_dir}")
 
+        eval_config_cls = TASKS[task]["eval_config_cls"]
         for idx in indices:
             if benchmark_json.is_file():
                 metadata = episode_metadata(benchmark_json, idx)
             else:
-                if not args.dry_run:
-                    raise SystemExit(f"Missing benchmark.json: {bench_dir}")
                 metadata = {
                     "task_description": "dry_run",
                     "object_label": "dry_run",
                     "slug": "dry_run",
                 }
+
             for repeat_idx in range(1, repeat_count + 1):
-                run_slug = (
-                    f"{task}_idx_{idx}_{metadata['slug']}"
-                    if repeat_count == 1
-                    else f"{task}_idx_{idx}_repeat_{repeat_idx}_{metadata['slug']}"
+                output_root = (
+                    output_base_dir
+                    / f"{task}_idx_{idx}_repeat_{repeat_idx}_{metadata['slug']}"
                 )
-                output_root = output_base_dir / run_slug
                 run_info_path = output_root / "run_info.json"
                 if not args.dry_run:
                     run_info_path = write_run_info(
@@ -504,77 +496,73 @@ def run_eval(config: dict[str, Any], args: argparse.Namespace) -> int:
                         idx=idx,
                         repeat=repeat_idx,
                         bench_dir=bench_dir,
-                        checkpoint=checkpoint,
+                        eval_config_cls=eval_config_cls,
                     )
 
-                log_file = (
-                    log_dir / f"{task}_idx_{idx}.log"
-                    if repeat_count == 1
-                    else log_dir / f"{task}_idx_{idx}_repeat_{repeat_idx}.log"
-                )
+                log_file = log_dir / f"{task}_idx_{idx}_repeat_{repeat_idx}.log"
                 cmd = [
                     sys.executable,
-                    "launch_scripts/run_eval.py",
-                    "--checkpoint_path",
-                    str(checkpoint),
-                    "--benchmark_path",
+                    str(Path(__file__).resolve()),
+                    "run-one",
+                    "--eval-config-cls",
+                    eval_config_cls,
+                    "--benchmark-dir",
                     str(bench_dir),
-                    "--eval_config_cls",
-                    TASKS[task]["eval_config_cls"],
-                    "--output_dir",
+                    "--output-dir",
                     str(output_root),
-                    "--num_workers",
-                    str(num_workers(config)),
                     "--idx",
                     str(idx),
+                    "--num-workers",
+                    str(num_workers(config)),
+                    "--seed",
+                    str(seed(config)),
                 ]
                 horizon = task_horizon(config)
                 if horizon is not None:
-                    cmd.extend(["--task_horizon", str(horizon)])
+                    cmd.extend(["--task-horizon-steps", str(horizon)])
                 if terminate_upon_success(config):
-                    cmd.append("--terminate_upon_success")
+                    cmd.append("--terminate-upon-success")
+                if (config.get("eval") or {}).get(
+                    "save_partial_trajectories_on_exception", False
+                ):
+                    cmd.append("--save-partial-trajectories-on-exception")
 
                 print(
                     f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] "
-                    f"Starting task={task} idx={idx} repeat={repeat_idx}"
+                    f"Starting planner task={task} idx={idx} repeat={repeat_idx}"
                 )
                 print(f"Log: {log_file}")
                 print(f"Run info: {run_info_path}")
                 exit_code = run_subprocess(
                     cmd,
-                    cwd=molmobot_root,
+                    cwd=molmospaces_root,
                     env=env,
                     dry_run=args.dry_run,
                     log_file=log_file,
                 )
-                process_status = "success" if exit_code == 0 else "failed"
+                if exit_code != 0:
+                    process_failure_count += 1
+
                 benchmark_success, benchmark_success_source = (
                     ("unknown", "dry_run")
                     if args.dry_run
                     else parse_benchmark_success(log_file)
                 )
+                trajectory_hash = "" if args.dry_run else hash_h5_outputs(output_root)
                 rows.append(
                     {
                         "task": task,
                         "idx": idx,
                         "repeat": repeat_idx,
-                        "process_status": process_status,
+                        "process_status": "success" if exit_code == 0 else "failed",
                         "exit_code": exit_code,
                         "benchmark_success": benchmark_success,
                         "benchmark_success_source": benchmark_success_source,
+                        "trajectory_hash": trajectory_hash,
                         "log_file": str(log_file),
+                        "output_root": str(output_root),
                     }
                 )
-                if exit_code == 0:
-                    process_success_count += 1
-                else:
-                    process_failure_count += 1
-                if benchmark_success == "success":
-                    benchmark_success_count += 1
-                elif benchmark_success == "failed":
-                    benchmark_failure_count += 1
-                else:
-                    benchmark_unknown_count += 1
 
     if not args.dry_run:
         with summary_file.open("w", newline="") as f:
@@ -588,32 +576,77 @@ def run_eval(config: dict[str, Any], args: argparse.Namespace) -> int:
                     "exit_code",
                     "benchmark_success",
                     "benchmark_success_source",
+                    "trajectory_hash",
                     "log_file",
+                    "output_root",
                 ],
                 delimiter="\t",
             )
             writer.writeheader()
             writer.writerows(rows)
 
-    print("RBY1 multitask eval complete.")
-    print(f"Process successes: {process_success_count}")
+    unique_hashes = sorted({str(row["trajectory_hash"]) for row in rows if row["trajectory_hash"]})
+    print("RBY1 planner eval complete.")
     print(f"Process failures: {process_failure_count}")
-    print(f"Benchmark successes: {benchmark_success_count}")
-    print(f"Benchmark failures: {benchmark_failure_count}")
-    print(f"Benchmark unknown: {benchmark_unknown_count}")
+    print(f"Runs: {len(rows)}")
+    print(f"Unique trajectory hashes: {len(unique_hashes)}")
     print(f"Summary: {summary_file}")
     return 1 if process_failure_count else 0
 
 
+def run_one(args: argparse.Namespace) -> int:
+    # Seed non-solver randomness before run_evaluation creates task samplers.
+    os.environ["PYTHONHASHSEED"] = str(args.seed)
+    random.seed(args.seed)
+
+    import numpy as np
+
+    from molmo_spaces.evaluation.eval_main import run_evaluation
+
+    np.random.seed(args.seed)
+
+    eval_kwargs = {
+        "eval_config_cls": args.eval_config_cls,
+        "benchmark_dir": args.benchmark_dir,
+        "checkpoint_path": None,
+        "task_horizon_steps": args.task_horizon_steps,
+        "output_dir": args.output_dir,
+        "num_workers": args.num_workers,
+        "use_wandb": False,
+        "episode_idx": args.idx,
+        "save_partial_trajectories_on_exception": (
+            args.save_partial_trajectories_on_exception
+        ),
+    }
+    # Some planner/data-generation config classes do not currently declare the
+    # eval-only terminate_upon_success field. Passing it through run_evaluation
+    # makes Pydantic reject the config before rollout starts, so planner repro
+    # runs use the task horizon and post-hoc success trace instead.
+    if args.terminate_upon_success:
+        print(
+            "Note: terminate_upon_success is not passed for planner configs; "
+            "using task horizon and saved success trace.",
+            flush=True,
+        )
+
+    results = run_evaluation(**eval_kwargs)
+    print(f"Success count: {results.success_count}, Total count: {results.total_count}")
+    print(f"Success rate: {results.success_rate:.1%}")
+    print(f"Output directory: {results.output_dir}")
+    for result in results.episode_results:
+        print(f"{result.house_id}/ep{result.episode_idx}: {'pass' if result.success else 'fail'}")
+    return 0
+
+
 def main() -> None:
     args = parse_args()
-    config = load_yaml_config(args.config)
+    if args.command == "run-one":
+        raise SystemExit(run_one(args))
 
+    config = load_yaml_config(args.config)
     if args.command == "describe":
         describe_config(config, args)
         return
-    if args.command == "prepare":
-        raise SystemExit(run_prepare(config, args))
     if args.command == "eval":
         raise SystemExit(run_eval(config, args))
 
