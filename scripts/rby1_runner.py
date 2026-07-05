@@ -37,14 +37,6 @@ TASKS: dict[str, dict[str, str]] = {
     },
 }
 
-KNOWN_POLICY_ENV = (
-    "RBY1_GRIPPER_OUTPUT_MODE",
-    "RBY1_GRIPPER_BINARY_THRESHOLD",
-    "RBY1_GRIPPER_OPEN_POSITION",
-    "RBY1_GRIPPER_CLOSED_POSITION",
-)
-
-
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -179,8 +171,6 @@ def setup_runtime_env(config: dict[str, Any]) -> dict[str, str]:
         pythonpath_parts.append(env["PYTHONPATH"])
     env["PYTHONPATH"] = ":".join(pythonpath_parts)
 
-    for key in KNOWN_POLICY_ENV:
-        env.pop(key, None)
     for key, value in (config.get("policy_env") or {}).items():
         env[str(key)] = str(value)
 
