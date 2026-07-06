@@ -24,7 +24,7 @@ indices:
 eval:
   num_workers: 1
   repeats: 3
-  task_horizon_steps: null
+  task_horizon_steps: 400
   terminate_upon_success: true
 
 policy_env:

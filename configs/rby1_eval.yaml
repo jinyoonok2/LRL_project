@@ -6,8 +6,8 @@ paths:
   cache_root: /u/xna8aw/workspace/live-robotics-lab/cache
   model_root: /u/xna8aw/workspace/live-robotics-lab/hf_models
   conda_env: /u/xna8aw/workspace/live-robotics-lab/envs/mlspaces
-  benchmark_version: "20260415"
-  benchmark_root: /u/xna8aw/workspace/live-robotics-lab/cache/molmo-spaces-resources/benchmarks/molmospaces-bench-v2/20260415
+  benchmark_version: "20260325_1"
+  benchmark_root: /u/xna8aw/workspace/live-robotics-lab/cache/molmo-spaces-resources/benchmarks/molmospaces-bench-v2/20260325_1
   checkpoint: /u/xna8aw/workspace/live-robotics-lab/hf_models/MolmoBot-RBY1Multitask
   output_base_dir: /u/xna8aw/workspace/live-robotics-lab/LRL_project/MolmoBot/MolmoBot/eval_output/baseline/rby1_eval
 
@@ -121,7 +121,7 @@ indices:
 
 eval:
   num_workers: 1
-  task_horizon_steps: null
+  task_horizon_steps: 400
   terminate_upon_success: true
 
 policy_env:

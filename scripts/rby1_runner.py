@@ -20,19 +20,19 @@ import yaml
 
 TASKS: dict[str, dict[str, str]] = {
     "pick": {
-        "benchmark_rel": "procthor-objaverse/rby1_benchmarks/pick_benchmark",
+        "benchmark_rel": "procthor-objaverse/rby1_bennchmarks/pick_benchmark",
         "eval_config_cls": "olmo.eval.configure_molmo_spaces:MolmoBotRBY1PickPnPEvalConfig",
     },
     "pnp": {
-        "benchmark_rel": "procthor-objaverse/rby1_benchmarks/pnp_benchmark",
+        "benchmark_rel": "procthor-objaverse/rby1_bennchmarks/pnp_benchmark",
         "eval_config_cls": "olmo.eval.configure_molmo_spaces:MolmoBotRBY1PickPnPEvalConfig",
     },
     "opening": {
-        "benchmark_rel": "ithor/rby1_benchmarks/opening_benchmark",
+        "benchmark_rel": "ithor/rby1_bennchmarks/door_opening_benchmark",
         "eval_config_cls": "olmo.eval.configure_molmo_spaces:MolmoBotRBY1DoorPlusOpenEvalConfig",
     },
     "door_opening": {
-        "benchmark_rel": "procthor-10k/rby1_benchmarks/door_opening_benchmark",
+        "benchmark_rel": "procthor-10k/rby1_bennchmarks/door_opening_benchmark",
         "eval_config_cls": "olmo.eval.configure_molmo_spaces:MolmoBotRBY1DoorPlusOpenEvalConfig",
     },
 }
