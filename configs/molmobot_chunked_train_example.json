@@ -1,0 +1,62 @@
+{
+  "defaults": {
+    "project_root": ".",
+    "molmobot_dir": "MolmoBot/MolmoBot",
+    "base_checkpoint": "/bigtemp/<user>/LRL/hf_models/MolmoBot-RBY1Multitask",
+    "save_folder": "/bigtemp/<user>/molmobot_runs/rby1_chunked_train",
+    "stats_path": "/bigtemp/<user>/molmobot_runs/rby1_chunked_train/rby1_norm_stats.yaml",
+    "data_paths": [
+      "/bigtemp/<user>/molmobot_data/smoke/RBY1PickAndPlaceDataGenConfig/part0"
+    ],
+    "action_preset": "RBY1_multitask",
+    "camera_preset": "RBY1_full_with_head_gopro",
+    "seq_len": 1024,
+    "device_batch_size": 8,
+    "global_batch_size": 256,
+    "num_gpus": 4,
+    "no_val": true,
+    "save_interval": 1000,
+    "save_interval_ephemeral": 100,
+    "save_num_checkpoints_to_keep": 2,
+    "checkpoint_retention_frequency": 10000,
+    "extra_args": [
+      "--model.vision_backbone.vit.float32_attention=false"
+    ],
+    "env": {
+      "WANDB_MODE": "offline",
+      "WANDB_PROJECT": "molmobot-chunked-train",
+      "WANDB_ENTITY": "dummy"
+    },
+    "slurm": {
+      "partition": "gpu",
+      "account": "<slurm-account>",
+      "constraint": "a100_80gb",
+      "cpus_per_task": 10,
+      "mem": "200G",
+      "time": "08:00:00",
+      "log_dir": "slurm_logs",
+      "modules": [
+        "miniforge/25.3.1-py3.12",
+        "cuda/12.8.1",
+        "gcc/12.4.0"
+      ],
+      "conda_activate": "/path/to/molmobot/env"
+    }
+  },
+  "fragments": [
+    {
+      "name": "rby1-chunk-001",
+      "target_step": 1000
+    },
+    {
+      "name": "rby1-chunk-002",
+      "target_step": 2000,
+      "load_path": "previous"
+    },
+    {
+      "name": "rby1-chunk-003",
+      "target_step": 3000,
+      "load_path": "previous"
+    }
+  ]
+}
