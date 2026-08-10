@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import shutil
 import os
 import re
 import subprocess
@@ -20,19 +21,20 @@ import yaml
 
 TASKS: dict[str, dict[str, str]] = {
     "pick": {
-        "benchmark_rel": "procthor-objaverse/rby1_bennchmarks/pick_benchmark",
+        "benchmark_rel": "procthor-objaverse/rby1_benchmarks/pick_benchmark",
         "eval_config_cls": "olmo.eval.configure_molmo_spaces:MolmoBotRBY1PickPnPEvalConfig",
     },
     "pnp": {
-        "benchmark_rel": "procthor-objaverse/rby1_bennchmarks/pnp_benchmark",
+        "benchmark_rel": "procthor-objaverse/rby1_benchmarks/pnp_benchmark",
         "eval_config_cls": "olmo.eval.configure_molmo_spaces:MolmoBotRBY1PickPnPEvalConfig",
     },
     "opening": {
-        "benchmark_rel": "ithor/rby1_bennchmarks/door_opening_benchmark",
+        "benchmark_version": "20260327",
+        "benchmark_rel": "ithor/rby1_benchmarks/opening_benchmark",
         "eval_config_cls": "olmo.eval.configure_molmo_spaces:MolmoBotRBY1DoorPlusOpenEvalConfig",
     },
     "door_opening": {
-        "benchmark_rel": "procthor-10k/rby1_bennchmarks/door_opening_benchmark",
+        "benchmark_rel": "procthor-10k/rby1_benchmarks/door_opening_benchmark",
         "eval_config_cls": "olmo.eval.configure_molmo_spaces:MolmoBotRBY1DoorPlusOpenEvalConfig",
     },
 }
@@ -148,15 +150,15 @@ def selected_tasks_and_indices(
 def setup_runtime_env(config: dict[str, Any]) -> dict[str, str]:
     paths = config.get("paths", {})
     project_root = path_from(config, "project_root")
-    cache_root = path_from(config, "cache_root")
+    cache_root = path_from(config, "cache_root").resolve()
 
     env = os.environ.copy()
-    env.setdefault("MLSPACES_CACHE_DIR", str(cache_root / "molmo-spaces-resources"))
-    env.setdefault("MLSPACES_ASSETS_DIR", str(cache_root / "molmospaces/assets"))
-    env.setdefault("HF_HOME", str(cache_root / "huggingface"))
-    env.setdefault("TRANSFORMERS_CACHE", str(cache_root / "huggingface/transformers"))
-    env.setdefault("TORCH_HOME", str(cache_root / "torch"))
-    env.setdefault("XDG_CACHE_HOME", str(cache_root / "xdg"))
+    env["MLSPACES_CACHE_DIR"] = str(cache_root / "molmo-spaces-resources")
+    env["MLSPACES_ASSETS_DIR"] = str(cache_root / "molmospaces/assets")
+    env["HF_HOME"] = str(cache_root / "huggingface")
+    env["TRANSFORMERS_CACHE"] = str(cache_root / "huggingface/transformers")
+    env["TORCH_HOME"] = str(cache_root / "torch")
+    env["XDG_CACHE_HOME"] = str(cache_root / "xdg")
     env.setdefault("MUJOCO_GL", "egl")
     env.setdefault("PYOPENGL_PLATFORM", "egl")
     env.setdefault("MUJOCO_EGL_DEVICE_ID", "0")
@@ -192,7 +194,49 @@ def setup_runtime_env(config: dict[str, Any]) -> dict[str, str]:
 
 
 def benchmark_dir(config: dict[str, Any], task: str) -> Path:
-    return path_from(config, "benchmark_root") / TASKS[task]["benchmark_rel"]
+    benchmark_root = path_from(config, "benchmark_root")
+    task_config = TASKS[task]
+    benchmark_version = task_config.get("benchmark_version")
+    if benchmark_version is not None:
+        benchmark_root = benchmark_root.parent / benchmark_version
+    return benchmark_root / task_config["benchmark_rel"]
+
+
+def maybe_patched_benchmark_dir(
+    config: dict[str, Any],
+    task: str,
+    *,
+    dry_run: bool,
+) -> Path:
+    source_dir = benchmark_dir(config, task)
+    if task != "pnp":
+        return source_dir
+
+    source_json = source_dir / "benchmark.json"
+    if dry_run:
+        return source_dir
+    if not source_json.is_file():
+        raise SystemExit(f"Missing benchmark.json: {source_dir}")
+
+    cache_root = path_from(config, "cache_root").resolve()
+    benchmark_version = str(config.get("paths", {}).get("benchmark_version", "unknown"))
+    target_dir = cache_root / "rby1_patched_benchmarks" / benchmark_version / "pnp_benchmark"
+    target_json = target_dir / "benchmark.json"
+
+    if target_dir.exists():
+        shutil.rmtree(target_dir)
+    shutil.copytree(source_dir, target_dir)
+    target_json.chmod(0o600)
+
+    episodes = json.loads(target_json.read_text())
+    for episode in episodes:
+        task_spec = episode.setdefault("task", {})
+        task_spec["task_type"] = "pick_and_place"
+        task_spec["task_cls"] = "molmo_spaces.tasks.pick_and_place_task.PickAndPlaceTask"
+        task_spec["max_place_receptacle_pos_displacement"] = 0.15
+        task_spec["max_place_receptacle_rot_displacement"] = 1.0471975511965976
+    target_json.write_text(json.dumps(episodes, indent=2) + "\n")
+    return target_dir
 
 
 def slugify(text: str, max_len: int = 90) -> str:
@@ -462,7 +506,7 @@ def run_eval(config: dict[str, Any], args: argparse.Namespace) -> int:
     benchmark_unknown_count = 0
 
     for task in tasks:
-        bench_dir = benchmark_dir(config, task)
+        bench_dir = maybe_patched_benchmark_dir(config, task, dry_run=args.dry_run)
         benchmark_json = bench_dir / "benchmark.json"
         if not args.dry_run and not benchmark_json.is_file():
             raise SystemExit(f"Missing benchmark.json: {bench_dir}")
