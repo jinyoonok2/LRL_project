@@ -45,23 +45,31 @@ def checkpoint_valid(path: Path, *, require_optimizer: bool = True) -> bool:
 
 
 def latest_checkpoint(save_folder: Path) -> Path | None:
-    checkpoints = save_folder / "checkpoints"
-    if not checkpoints.exists():
-        return None
     steps: list[tuple[int, Path]] = []
-    for child in checkpoints.iterdir():
-        if child.is_dir() and child.name.startswith("step"):
-            try:
-                steps.append((int(child.name[4:]), child))
-            except ValueError:
-                continue
+    for parent in (save_folder, save_folder / "checkpoints"):
+        if not parent.exists():
+            continue
+        for child in parent.iterdir():
+            if child.is_dir() and child.name.startswith("step"):
+                try:
+                    step = int(child.name[4:])
+                except ValueError:
+                    continue
+                if checkpoint_valid(child):
+                    steps.append((step, child))
     return max(steps, default=(0, None))[1]
 
 
 def fragment_checkpoint(fragment: dict[str, Any], defaults: dict[str, Any], project_root: Path) -> Path:
     save_folder = as_path(fragment.get("save_folder", defaults["save_folder"]), project_root)
     target_step = int(fragment["target_step"])
-    return save_folder / "checkpoints" / f"step{target_step}"
+    direct = save_folder / f"step{target_step}"
+    nested = save_folder / "checkpoints" / f"step{target_step}"
+    if checkpoint_valid(direct):
+        return direct
+    if checkpoint_valid(nested):
+        return nested
+    return direct
 
 
 def resolved_load_path(
