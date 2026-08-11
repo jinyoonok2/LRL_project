@@ -104,6 +104,10 @@ def quote_join(parts: list[str]) -> str:
     return " ".join(shlex.quote(str(p)) for p in parts)
 
 
+def timing_line(event: str) -> str:
+    return f'echo "[chunked-train] {event} iso=$(date -Is) epoch=$(date +%s)"'
+
+
 def train_command(
     fragment: dict[str, Any],
     defaults: dict[str, Any],
@@ -174,6 +178,10 @@ def sbatch_command(plan: dict[str, Any], fragment: dict[str, Any], train_cmd: li
     exports = defaults.get("env", {}) | fragment.get("env", {})
 
     setup_lines = ["set -eo pipefail", f"cd {shlex.quote(str(molmobot_dir))}"]
+    setup_lines.insert(0, "JOB_START_TS=$(date +%s)")
+    setup_lines.insert(1, timing_line("job_start"))
+    setup_lines.append("SETUP_START_TS=$(date +%s)")
+    setup_lines.append(timing_line("setup_start"))
     if modules:
         setup_lines.append("module load " + " ".join(shlex.quote(str(m)) for m in modules))
     conda_activate = slurm.get("conda_activate")
@@ -183,7 +191,19 @@ def sbatch_command(plan: dict[str, Any], fragment: dict[str, Any], train_cmd: li
     setup_lines.append("export PYTHONPATH=${PYTHONPATH:-.}")
     for key, value in exports.items():
         setup_lines.append(f"export {key}={shlex.quote(str(value))}")
+    setup_lines.append("SETUP_END_TS=$(date +%s)")
+    setup_lines.append('echo "[chunked-train] setup_end iso=$(date -Is) epoch=${SETUP_END_TS} duration_sec=$((SETUP_END_TS - SETUP_START_TS))"')
+    setup_lines.append("TRAIN_START_TS=$(date +%s)")
+    setup_lines.append(timing_line("train_command_start"))
+    setup_lines.append("set +e")
     setup_lines.append(quote_join(train_cmd))
+    setup_lines.append("TRAIN_STATUS=$?")
+    setup_lines.append("set -e")
+    setup_lines.append("TRAIN_END_TS=$(date +%s)")
+    setup_lines.append('echo "[chunked-train] train_command_end iso=$(date -Is) epoch=${TRAIN_END_TS} duration_sec=$((TRAIN_END_TS - TRAIN_START_TS)) exit_code=${TRAIN_STATUS}"')
+    setup_lines.append("JOB_END_TS=$(date +%s)")
+    setup_lines.append('echo "[chunked-train] job_end iso=$(date -Is) epoch=${JOB_END_TS} duration_sec=$((JOB_END_TS - JOB_START_TS)) exit_code=${TRAIN_STATUS}"')
+    setup_lines.append("exit ${TRAIN_STATUS}")
     wrapped = "bash -lc " + shlex.quote("\n".join(setup_lines))
 
     name = fragment.get("name", f"molmobot-step{fragment['target_step']}")
