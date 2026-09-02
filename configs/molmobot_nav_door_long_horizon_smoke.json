@@ -1,0 +1,52 @@
+{
+  "defaults": {
+    "project_root": "/u/xna8aw/workspace/live-robotics-lab/LRL_project",
+    "molmobot_dir": "MolmoBot/MolmoBot",
+    "base_checkpoint": "/bigtemp/xna8aw/LRL/hf_models/MolmoBot-RBY1Multitask",
+    "save_folder": "/bigtemp/xna8aw/molmobot_runs/nav_door_long_horizon_smoke",
+    "stats_path": "/bigtemp/xna8aw/molmobot_runs/nav_door_long_horizon_smoke/nav_door_norm_stats.yaml",
+    "data_paths": [
+      "/bigtemp/xna8aw/molmobot_data/nav_door_long_horizon_smoke"
+    ],
+    "action_preset": "RBY1_multitask",
+    "camera_preset": "RBY1_full_with_head_gopro",
+    "seq_len": 1024,
+    "device_batch_size": 1,
+    "global_batch_size": 2,
+    "num_gpus": 2,
+    "no_val": true,
+    "save_interval": 2,
+    "save_interval_ephemeral": 1,
+    "save_num_checkpoints_to_keep": 1,
+    "checkpoint_retention_frequency": 2,
+    "extra_args": [
+      "--model.vision_backbone.vit.float32_attention=false"
+    ],
+    "env": {
+      "WANDB_MODE": "offline",
+      "WANDB_PROJECT": "molmobot-nav-door-smoke",
+      "WANDB_ENTITY": "dummy"
+    },
+    "slurm": {
+      "partition": "gpu",
+      "account": "xna8aw_base",
+      "constraint": "h100_94gb",
+      "cpus_per_task": 10,
+      "mem": "200G",
+      "time": "02:00:00",
+      "log_dir": "slurm_logs",
+      "modules": [
+        "miniforge/25.3.1-py3.12",
+        "cuda/12.8.1",
+        "gcc/12.4.0"
+      ],
+      "conda_activate": "/u/xna8aw/workspace/live-robotics-lab/envs/mlspaces"
+    }
+  },
+  "fragments": [
+    {
+      "name": "molmobot-nav-door-smoke-step2",
+      "target_step": 2
+    }
+  ]
+}
