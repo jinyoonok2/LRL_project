@@ -12,7 +12,6 @@ CONFIG_BY_MODE = {
     "none": "RBY1NavDoorOpeningHandoffSmokeConfig",
     "visible_unique": "RBY1NavDoorOpeningVisibleGroundingSmokeConfig",
     "point_prompt": "RBY1NavDoorOpeningPointPromptGroundingSmokeConfig",
-    "room_door_id": "RBY1NavDoorOpeningRoomDoorIdGroundingSmokeConfig",
 }
 CONFIG_MODULE = "molmo_spaces.data_generation.config.door_opening_configs"
 

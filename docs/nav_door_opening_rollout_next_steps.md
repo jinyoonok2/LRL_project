@@ -104,56 +104,20 @@ Expected direction:
 - Too loose: more cuRobo attempts, but many fail because the robot starts from poor poses.
 - Best setting: start cuRobo only when the handle is reachable and the base orientation is reasonable.
 
-### 4. Add Target-Door Grounding
+### 4. Use a Simple Visible-Door Training Scope
 
-Stage 1 uses a target door that is visible and unambiguous in the initial head-camera view:
+Following project feedback, the first fine-tuning experiment is intentionally limited to a simple and learnable setup:
 
-- Require a minimum target-door segmentation fraction.
-- Optionally require target-handle visibility for later point-prompt experiments.
-- Reject starts where another door is also visibly competing with the target.
-- Face the target during Stage-1 placement so the initial observation contains the goal.
-- Save target-door, handle-visibility, and competing-door metadata in `obs_scene`.
+- Place RB-Y1 directly in front of the target door.
+- Sample close-to-medium start distances between `0.8m` and `3.0m`.
+- Require the target door to be clearly visible in the initial head-camera image.
+- Reject views containing another substantially visible competing door.
 - Use the instruction `Navigate to the visible door and ...`.
+- Save only trajectories that complete both navigation and door opening.
 
-Implementation status:
+`RBY1NavDoorOpeningSimpleVisibleDataGenConfig` is the primary configuration for this dataset. It retains connectivity-aware sampling, balanced handoff, final orientation, and the custom short-path A* fix.
 
-- Opt-in grounding fields were added to the door sampler and task configs.
-- Visibility and ambiguity rejection were added only to `NavToDoorOpeningTaskSampler`.
-- `NavToDoorOpeningTask` now records grounding metadata in generated trajectories.
-- `RBY1NavDoorOpeningVisibleGroundingSmokeConfig` provides an isolated Stage-1 test.
-- Smoke job `6557043` is queued for end-to-end validation.
-
-Stage 2 uses the existing `object_image_points/door_handle` annotations and MolmoBot point-prompt support:
-
-- Requires both the target door and one of its handles to be visible initially.
-- Allows other visible doors because the target handle is explicitly pointed out.
-- Uses the instruction `Navigate to the pointed door and ...`.
-- Is available through `RBY1NavDoorOpeningPointPromptGroundingSmokeConfig`.
-- Point-prompt smoke job `6557045` accepted a target immediately despite four visible competing doors, recorded nine target-handle points in frame 0, and completed navigation. Door manipulation failed, so this smoke trajectory is not training-success data.
-
-The grounding implementation is isolated in nav-door-specific task and sampler config subclasses. Users can select `none`, `visible_unique`, `point_prompt`, or `room_door_id` through:
-
-```bash
-python scripts/run_rby1_nav_door_grounding.py --grounding-mode point_prompt
-```
-
-The `room_door_id` mode does not require the target door to be initially visible. It supplies:
-
-- The robot's initial `room_#` ID.
-- A stable `house_#/door_#` target ID.
-- The target handle's map XY coordinates.
-- Up to two room IDs nearest the target door.
-- A generated instruction containing the same structured goal.
-
-The ID is scene-local and is not visually meaningful by itself; target coordinates make the goal actionable with the base pose already present in robot state. This mode assumes MolmoSpaces or another localization system provides equivalent room/door goal metadata during evaluation.
-
-Stage 3 may add a separate target-door reference image for initially unseen targets.
-
-Stage-1 smoke result:
-
-- `visible_unique` eventually found a valid target and completed navigation, but required 149 placement rejections because other doors remained visible.
-- Door manipulation failed in the accepted smoke episode.
-- This mode is useful as a controlled baseline but is too restrictive for efficient large-scale generation in multi-door scenes.
+The room graph, room/door-ID route, dynamic subgoal, and initially invisible target plans have been discarded from the current scope. Point-prompt code remains available as an optional experiment but is not part of the primary fine-tuning dataset.
 
 ### 5. Add Reachability Checks Before cuRobo
 
