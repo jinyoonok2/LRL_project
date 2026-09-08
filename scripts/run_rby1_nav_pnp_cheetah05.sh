@@ -14,7 +14,7 @@ PYTHON_BIN="${PYTHON_BIN:-/u/xna8aw/workspace/live-robotics-lab/envs/mlspaces/bi
 CONFIG_NAME="${1:-RBY1NavPickAndPlaceFastDebugDataGenConfig}"
 TIMEOUT_SEC="${TIMEOUT_SEC:-1200}"
 
-export PYTHONPATH="${MOLMOSPACES_DIR}:${PYTHONPATH:-}"
+export PYTHONPATH="${PROJECT_ROOT}:${MOLMOSPACES_DIR}:${PYTHONPATH:-}"
 export MUJOCO_GL="${MUJOCO_GL:-egl}"
 export PYOPENGL_PLATFORM="${PYOPENGL_PLATFORM:-egl}"
 export MUJOCO_EGL_DEVICE_ID="${MUJOCO_EGL_DEVICE_ID:-0}"
@@ -27,5 +27,5 @@ echo "[nav-pnp-cheetah05] config=${CONFIG_NAME}"
 echo "[nav-pnp-cheetah05] timeout_sec=${TIMEOUT_SEC}"
 nvidia-smi --query-gpu=name,memory.total,memory.used --format=csv,noheader || true
 
-timeout "${TIMEOUT_SEC}s" "${PYTHON_BIN}" -u -m molmo_spaces.data_generation.main \
-  "molmo_spaces.data_generation.config.object_manipulation_datagen_configs:${CONFIG_NAME}"
+timeout "${TIMEOUT_SEC}s" "${PYTHON_BIN}" -u -m lrl_molmospaces_extensions.datagen.main \
+  "lrl_molmospaces_extensions.configs.nav_pick_and_place:${CONFIG_NAME}"

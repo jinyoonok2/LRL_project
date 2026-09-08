@@ -13,7 +13,7 @@ CONFIG_BY_MODE = {
     "visible_unique": "RBY1NavDoorOpeningVisibleGroundingSmokeConfig",
     "point_prompt": "RBY1NavDoorOpeningPointPromptGroundingSmokeConfig",
 }
-CONFIG_MODULE = "molmo_spaces.data_generation.config.door_opening_configs"
+CONFIG_MODULE = "lrl_molmospaces_extensions.configs.door_opening"
 
 
 def main() -> None:
@@ -43,18 +43,17 @@ def main() -> None:
     command = [
         sys.executable,
         "-m",
-        "molmo_spaces.data_generation.main",
+        "lrl_molmospaces_extensions.datagen.main",
         config_ref,
     ]
 
     env = os.environ.copy()
     env["RBY1_NAV_DOOR_GROUNDING_MODE"] = args.grounding_mode
     current_pythonpath = env.get("PYTHONPATH")
-    env["PYTHONPATH"] = (
-        f"{molmospaces_root}:{current_pythonpath}"
-        if current_pythonpath
-        else str(molmospaces_root)
-    )
+    python_paths = [str(project_root), str(molmospaces_root)]
+    if current_pythonpath:
+        python_paths.append(current_pythonpath)
+    env["PYTHONPATH"] = ":".join(python_paths)
 
     if args.dry_run:
         print(f"RBY1_NAV_DOOR_GROUNDING_MODE={args.grounding_mode}")

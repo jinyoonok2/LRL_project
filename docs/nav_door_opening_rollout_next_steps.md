@@ -145,11 +145,32 @@ This should increase manipulation success without changing MolmoBot training cod
 
 After tuning the pipeline:
 
-- Run a larger success-search job.
+- Enumerate every door in each house deterministically instead of stopping after
+  a fixed number of arbitrary house-level successes.
+- Target three successful trajectories from distinct start poses per feasible
+  door.
+- Retry each door for at most 12 full rollouts, then mark it infeasible and
+  continue to the next door.
+- Save a per-house JSON manifest with each door's attempts, successes, and final
+  status.
 - Save only successful rollouts.
 - Keep a clean output directory structure under `assets/experiment_output/datagen`.
 - Generate GIFs for manual review.
 - Remove failed/debug/diagnostic outputs that could confuse later training.
+
+Implementation status:
+
+- Enabled for the simple-visible production shards A-F.
+- The rollout pipeline reports each success/failure to samplers that opt into
+  outcome feedback; all existing samplers retain their prior behavior.
+- The sampler preserves the existing connectivity, visibility, and
+  competing-door checks for every target door.
+- Per-door completion is scoped to the requested house, so completing one
+  house cannot cause later houses in a shard to be skipped.
+- Production runs checkpoint every successful trajectory immediately into a
+  separate H5/video chunk. Completed demonstrations therefore survive a later
+  crash or interruption, and only successfully written histories are released
+  from memory.
 
 ### 8. Prepare Data For MolmoBot Fine-Tuning
 
