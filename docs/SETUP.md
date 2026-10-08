@@ -10,10 +10,10 @@ For this project's working source stack, use the forked submodule commits:
 MolmoBot:   jinyoonok2/MolmoBot
             9c2ebfa5cafcf13f9664e70703e25de38e1d5fcb
 MolmoSpaces: jinyoonok2/molmospaces
-            d4bacaeae830c085f02b433a9da9296d394df515
+            0403cb7e3bbf96fc6c622b7d31b4a24ce13cb55d
 ```
 
-The MolmoSpaces pin includes the documentation-only consolidation commit after `fabf2af`; its implementation is unchanged. See [the fork change record](../molmospaces/docs/FORK_CHANGES.md) for the complete history from the original pinned release. MolmoBot uses branch `rby1-compatible`; MolmoSpaces uses `rby1-long-horizon-vla`.
+The MolmoSpaces pin includes the documentation-only consolidation commit after `fabf2af`; its implementation is unchanged. See [the fork change record](../molmospaces/docs/FORK_CHANGES.md) for the complete history from the original pinned release. MolmoBot uses branch `rby1-compatible`; MolmoSpaces uses `rby1-compatible`.
 
 In a fresh clone of `https://github.com/jinyoonok2/LRL_project.git`, initialize submodules and inspect the recorded revisions:
 
@@ -28,7 +28,7 @@ If reproducing this dated snapshot in a clean clone, explicitly select the two c
 
 ```bash
 git -C MolmoBot checkout 9c2ebfa5cafcf13f9664e70703e25de38e1d5fcb
-git -C molmospaces checkout d4bacaeae830c085f02b433a9da9296d394df515
+git -C molmospaces checkout 0403cb7e3bbf96fc6c622b7d31b4a24ce13cb55d
 ```
 
 For a reconstruction from original upstream source, MolmoBot's `MolmoBot/pyproject.toml` pins MolmoSpaces to `cd23becebcf72dd93a4aa5872a60802d5eff03ef`. Start from that MolmoSpaces base and port the compatibility fixes below. Installing that upstream pin alone omits our patches. Using arbitrary latest versions has not been validated here. The exact patched fork commits are the preferred reference.
