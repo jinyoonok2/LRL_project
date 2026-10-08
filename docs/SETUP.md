@@ -8,15 +8,15 @@ For this project's working source stack, use the forked submodule commits:
 
 ```text
 MolmoBot:   jinyoonok2/MolmoBot
-            a190df0bc631cd0cfce4544e3d30f7910337e113
+            3bdb8fbb976eb662f3d48331bf8ea8809ef38e58
 MolmoSpaces: jinyoonok2/molmospaces
-            a7bcb57ad7be3472df16a68dd401b930e69b19a8
+            685e1b18ff64aa60ab95bf07acb76c5a7b3acd51
 ```
 
 Both pins include documentation-only updates after the working implementation commits (MolmoBot `9c2ebfa`, MolmoSpaces `fabf2af`). Both forks use `rby1-compatible`. Their self-contained records provide baseline commits, retained fixes, exact source reconstruction, paired installation, and benchmark verification:
 
-- [MolmoBot changes and reproduction](../MolmoBot/docs/FORK_CHANGES.md)
-- [MolmoSpaces changes and reproduction](../molmospaces/docs/FORK_CHANGES.md)
+- [MolmoBot changes and reproduction](../MolmoBot/FORK_CHANGES.md)
+- [MolmoSpaces changes and reproduction](../molmospaces/FORK_CHANGES.md)
 
 In a fresh clone of `https://github.com/jinyoonok2/LRL_project.git`, initialize submodules and inspect the recorded revisions:
 
@@ -30,8 +30,8 @@ git -C molmospaces rev-parse HEAD
 If reproducing this dated snapshot in a clean clone, explicitly select the two commits above. Do not switch or reset the existing dirty workspace to follow this recipe.
 
 ```bash
-git -C MolmoBot checkout a190df0bc631cd0cfce4544e3d30f7910337e113
-git -C molmospaces checkout a7bcb57ad7be3472df16a68dd401b930e69b19a8
+git -C MolmoBot checkout 3bdb8fbb976eb662f3d48331bf8ea8809ef38e58
+git -C molmospaces checkout 685e1b18ff64aa60ab95bf07acb76c5a7b3acd51
 ```
 
 For a reconstruction from original upstream source, MolmoBot's `MolmoBot/pyproject.toml` pins MolmoSpaces to `cd23becebcf72dd93a4aa5872a60802d5eff03ef`. Start from that MolmoSpaces base and port the compatibility fixes below. Installing that upstream pin alone omits our patches. Using arbitrary latest versions has not been validated here. The exact patched fork commits are the preferred reference.
