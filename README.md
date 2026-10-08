@@ -9,7 +9,8 @@ Start with these maintained guides:
 
 - [Project environment, storage, and repository state](docs/PROJECT_ENVIRONMENT.md)
 - [Setup, pinned commits, and compatibility fixes](docs/SETUP.md)
-- [MolmoSpaces fork changes from the original release](molmospaces/docs/FORK_CHANGES.md)
+- [MolmoBot fork changes and reproduction](MolmoBot/docs/FORK_CHANGES.md)
+- [MolmoSpaces fork changes and reproduction](molmospaces/docs/FORK_CHANGES.md)
 - [Research plan and next steps](docs/RESEARCH_PLAN.md)
 - [Extension commands](lrl_molmospaces_extensions/README.md)
 

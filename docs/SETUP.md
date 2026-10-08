@@ -8,12 +8,15 @@ For this project's working source stack, use the forked submodule commits:
 
 ```text
 MolmoBot:   jinyoonok2/MolmoBot
-            9c2ebfa5cafcf13f9664e70703e25de38e1d5fcb
+            a190df0bc631cd0cfce4544e3d30f7910337e113
 MolmoSpaces: jinyoonok2/molmospaces
-            0403cb7e3bbf96fc6c622b7d31b4a24ce13cb55d
+            a7bcb57ad7be3472df16a68dd401b930e69b19a8
 ```
 
-The MolmoSpaces pin includes the documentation-only consolidation commit after `fabf2af`; its implementation is unchanged. See [the fork change record](../molmospaces/docs/FORK_CHANGES.md) for the complete history from the original pinned release. MolmoBot uses branch `rby1-compatible`; MolmoSpaces uses `rby1-compatible`.
+Both pins include documentation-only updates after the working implementation commits (MolmoBot `9c2ebfa`, MolmoSpaces `fabf2af`). Both forks use `rby1-compatible`. Their self-contained records provide baseline commits, retained fixes, exact source reconstruction, paired installation, and benchmark verification:
+
+- [MolmoBot changes and reproduction](../MolmoBot/docs/FORK_CHANGES.md)
+- [MolmoSpaces changes and reproduction](../molmospaces/docs/FORK_CHANGES.md)
 
 In a fresh clone of `https://github.com/jinyoonok2/LRL_project.git`, initialize submodules and inspect the recorded revisions:
 
@@ -27,8 +30,8 @@ git -C molmospaces rev-parse HEAD
 If reproducing this dated snapshot in a clean clone, explicitly select the two commits above. Do not switch or reset the existing dirty workspace to follow this recipe.
 
 ```bash
-git -C MolmoBot checkout 9c2ebfa5cafcf13f9664e70703e25de38e1d5fcb
-git -C molmospaces checkout 0403cb7e3bbf96fc6c622b7d31b4a24ce13cb55d
+git -C MolmoBot checkout a190df0bc631cd0cfce4544e3d30f7910337e113
+git -C molmospaces checkout a7bcb57ad7be3472df16a68dd401b930e69b19a8
 ```
 
 For a reconstruction from original upstream source, MolmoBot's `MolmoBot/pyproject.toml` pins MolmoSpaces to `cd23becebcf72dd93a4aa5872a60802d5eff03ef`. Start from that MolmoSpaces base and port the compatibility fixes below. Installing that upstream pin alone omits our patches. Using arbitrary latest versions has not been validated here. The exact patched fork commits are the preferred reference.
@@ -49,7 +52,7 @@ On a fresh machine, create a separate Python 3.11 environment. Install MolmoSpac
 
 ```bash
 python -m pip install -e './molmospaces[mujoco]'
-python -m pip install -e './MolmoBot/MolmoBot'
+python -m pip install -e './MolmoBot/MolmoBot[eval,train]'
 python -m pip install -e './molmospaces[mujoco]'
 python -m pip check
 ```

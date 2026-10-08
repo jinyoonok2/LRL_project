@@ -17,8 +17,8 @@ Custom long-horizon behavior lives in `lrl_molmospaces_extensions/`. Keep the ac
 | Repository | Observed branch | Verified HEAD |
 |---|---|---|
 | `LRL_project` | `rby1-long-horizon-vla-training` | `4aa392a23efac9f515655f219e5982e5df57c1fb` |
-| `MolmoBot` | `rby1-compatible` | `9c2ebfa5cafcf13f9664e70703e25de38e1d5fcb` |
-| `molmospaces` | `rby1-compatible` | `0403cb7e3bbf96fc6c622b7d31b4a24ce13cb55d` |
+| `MolmoBot` | `rby1-compatible` | `a190df0bc631cd0cfce4544e3d30f7910337e113` |
+| `molmospaces` | `rby1-compatible` | `a7bcb57ad7be3472df16a68dd401b930e69b19a8` |
 
 These are dated source snapshots, not promises about future branch tips. The project code, documentation, and report videos are committed. Environments, shared datasets, checkpoints, scheduler logs, and server-specific symlinks are outside Git and need their documented storage paths. Do not commit, push, move data, or submit new experiments unless requested.
 
@@ -220,3 +220,5 @@ Shared-copy verification completed: 2,417 regular files matched original sizes (
 - 2026-10-08 — Consolidated MolmoSpaces onto `rby1-long-horizon-vla`, removing the redundant `rby1-custom` name locally and from the fork. Added [the fork change record](../molmospaces/docs/FORK_CHANGES.md), covering `cd23bec` through compatibility commit `9b5f4e1` and final refactor `fabf2af`. The final source trees at `9b5f4e1` and `fabf2af` are identical; long-horizon implementation resides in the parent extensions. Updated the submodule pin to `d4bacaeae830c085f02b433a9da9296d394df515`, which adds only that record and its README link, and updated setup guidance.
 
 - 2026-10-08 — Renamed the retained MolmoSpaces branch to `rby1-compatible` to match MolmoBot, preserving the final VLA implementation and history. Published the new name and removed `rby1-long-horizon-vla` from the fork. Updated the fork change record and parent submodule pin to `0403cb7e3bbf96fc6c622b7d31b4a24ce13cb55d`; only documentation changed.
+
+- 2026-10-08 — Published self-contained `docs/FORK_CHANGES.md` records on both forks' `rby1-compatible` branches. Records include immutable original/compatible source commits, per-file fixes, reverted experiment history, paired installation and asset configuration, one-episode benchmark commands, and exact patch reconstruction. Both reconstruction recipes passed in isolated temporary checkouts and matched the target source exactly. Updated parent pins to MolmoBot `a190df0bc631cd0cfce4544e3d30f7910337e113` and MolmoSpaces `a7bcb57ad7be3472df16a68dd401b930e69b19a8`; runtime implementations remain unchanged.
