@@ -17,7 +17,7 @@ Custom long-horizon behavior lives in `lrl_molmospaces_extensions/`. Keep the ac
 | Repository | Observed branch | Verified HEAD |
 |---|---|---|
 | `LRL_project` | `rby1-long-horizon-vla-training` | `4aa392a23efac9f515655f219e5982e5df57c1fb` |
-| `MolmoBot` | `rby1-custom` | `9c2ebfa5cafcf13f9664e70703e25de38e1d5fcb` |
+| `MolmoBot` | `rby1-compatible` | `9c2ebfa5cafcf13f9664e70703e25de38e1d5fcb` |
 | `molmospaces` | `rby1-long-horizon-vla` | `fabf2af3839ca59ac35913271379fb97cd60914e` |
 
 These are dated source snapshots, not promises about future branch tips. The parent repository has existing modified and untracked work; a checkout of its HEAD alone does not reproduce every current dataset utility. Preserve that work. Do not commit, push, move data, or submit new experiments unless requested.
@@ -214,3 +214,5 @@ Shared-copy verification completed: 2,417 regular files matched original sizes (
 - 2026-10-07 — Added the shared-project symlink; removed obsolete ten-episode/GIF and retired-dataset launchers, simplified comparison export to MP4-only, and cleared extension/script bytecode caches. Kept reusable modules, working results, current launchers, and historical logs.
 
 - 2026-10-08 — Cleaned the parent repository before preparing a project summary. Retained only local branches `main`, `rby1`, and `rby1-long-horizon-vla-training`; removed stale worktree registration and local branches `backup/rby1-dev-before-mainbase-20260603_032414` (tip `4d9f04c`), `rby1-custom` (`998fb74`), `rby1-dev` (`16105c0`), `rby1-manual-teleop` (`5a08d97`), and `rby1-solo-panel-evaluation` (`4aa392a`). Remote branches and submodule branches were unchanged. Removed the retired RTX 4090 training-smoke and cheetah05 Pick/PnP debug launchers, the old 450-step Pick/PnP experiment config, 40 unreferenced logs from obsolete runs with Python exceptions, and generated test caches. Removed five empty abandoned-training directories and the broken `molmobot_datasets/nav_door_shards_abcdef` link to the retired dataset, then removed its empty parent directory. Retained historical completed checkpoints, audit records, current training/evaluation logs, the final dataset, and all 90 comparison videos.
+
+- 2026-10-08 — Consolidated the identical MolmoBot branches `rby1-custom` and `rby1-long-horizon-vla-training` into `rby1-compatible`, preserving commit `9c2ebfa`. Published the new branch and removed both old branch names locally and from the MolmoBot fork. The parent repository and MolmoSpaces branch names and submodule commit pins were unchanged.
