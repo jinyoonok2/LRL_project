@@ -1,5 +1,7 @@
 # VLA Data-Generation File Manifest
 
+> Historical research record. For current setup, paths, and source versions, use [PROJECT_ENVIRONMENT.md](PROJECT_ENVIRONMENT.md) and [SETUP.md](SETUP.md). Proposed steps and implementation locations below may have been superseded.
+
 Snapshot: 2026-09-08  
 Branch: `rby1-long-horizon-vla-training`
 
@@ -82,7 +84,6 @@ These launchers now add `LRL_project` to `PYTHONPATH` and load extension modules
 through the `module:ConfigName` interface:
 
 - `scripts/run_rby1_nav_door_grounding.py`
-- `scripts/run_rby1_nav_pnp_cheetah05.sh`
 
 `scripts/run_rby1_door_stability_kuorobot01.sh` supports:
 
@@ -124,11 +125,10 @@ relocated to `lrl_molmospaces_extensions/`:
 
 ## VLA documentation and presentation artifacts
 
-- `docs/nav_to_manip_rollout_finetuning_plan.md`
-- `docs/nav_door_opening_rollout_next_steps.md`
+- `docs/RESEARCH_PLAN.md` consolidates the earlier navigation/fine-tuning plans. Original documents remain available in Git history; the environment/setup guides stay separate.
 - `docs/slide_history/2026-09-07_per_door_vla_dataset_progress.md`
 - `docs/slide_history/2026-09-14_single_panel_door_stability_plan.md`
-- `docs/slide_history/media/2026-09-07/`
+- `docs/slide_history/media/`: current 90 expert/model MP4 comparisons and grasp metrics; older GIF galleries were removed.
 - `docs/single_panel_trajectory_audit_2026-09-07.json`
 - `docs/single_panel_trajectory_audit_2026-09-07.single_panel_files.txt`
 

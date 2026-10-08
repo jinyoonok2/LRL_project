@@ -77,6 +77,7 @@ class NavToDoorOpeningTask(DoorOpeningTask):
         obs_scene.update(
             {
                 "target_door_name": self.door_object.name,
+                "task_object_names": self.get_task_objects(),
                 "target_grounding_mode": task_config.target_grounding_mode,
                 "target_door_visibility_fraction": (
                     task_config.target_door_visibility_fraction

@@ -4,10 +4,8 @@ set -euo pipefail
 # Submit multiple RBY1 evaluation YAML configs to Slurm.
 #
 # Usage:
-#   bash scripts/sbatch_rby1_experiments.sh \
-#     configs/rby1_pick_pnp_binary.yaml \
-#     configs/rby1_pick_pnp_horizon450.yaml \
-#     configs/rby1_pick_pnp_horizon450_binary.yaml
+#   bash scripts/sbatch_rby1_experiments.sh configs/rby1_eval.yaml
+# Pass additional YAML configs to submit one evaluation job per config.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 

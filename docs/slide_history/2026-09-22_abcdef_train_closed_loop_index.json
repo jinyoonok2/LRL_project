@@ -1,0 +1,48 @@
+{
+  "n_success": 4,
+  "n_failure": 60,
+  "n_with_videos": 64,
+  "houses": [
+    3,
+    4,
+    6,
+    7,
+    10,
+    11,
+    13,
+    15,
+    17,
+    18,
+    19,
+    20,
+    26,
+    28,
+    30,
+    31,
+    32,
+    35,
+    36
+  ],
+  "successes": [
+    {
+      "house_index": 10,
+      "door_body_name": "doorway_b395de4844c86757425df4041f75ab82_1_2_5",
+      "action": "push"
+    },
+    {
+      "house_index": 13,
+      "door_body_name": "doorway_3b069dcd7183eb70556d351fd695d479_2_4_4",
+      "action": "push"
+    },
+    {
+      "house_index": 19,
+      "door_body_name": "doorway_f09c8311308eb10c777a36ef4eb09aaf_1_2_3",
+      "action": "push"
+    },
+    {
+      "house_index": 6,
+      "door_body_name": "doorway_3b069dcd7183eb70556d351fd695d479_1_4_2",
+      "action": "push"
+    }
+  ]
+}

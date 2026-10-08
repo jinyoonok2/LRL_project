@@ -8,3 +8,14 @@ rby1_diagram_images/Untitled
 
 # Large local evaluation artifacts live inside the MolmoBot submodule.
 MolmoBot/MolmoBot-SPOC/eval_output/
+
+# Shared storage link and generated scheduler logs.
+molmobot_molmospace
+slurm_logs/
+
+# Generated test runner state.
+.pytest_cache/
+
+# Server-specific dataset/run shortcuts.
+results/final
+results/nav_door_point_matched/

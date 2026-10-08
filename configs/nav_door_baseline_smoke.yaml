@@ -1,0 +1,12 @@
+# One baseline: expert generation -> opening-matched navigation -> point prompts.
+name: nav_door_point_matched
+output_root: /bigtemp/xna8aw/nav_door/baselines
+house_inds: [22]
+val_house_inds: []
+successes_per_door: 1
+max_attempts_per_door: 2
+required_action: both
+seed: 42
+point_prompt: true
+draw_point: true
+marker_radius: 5

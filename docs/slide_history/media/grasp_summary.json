@@ -1,0 +1,11 @@
+{
+  "min_grasp_frames": 30,
+  "criterion": "Cumulative frames of either recorded gripper grasp state > 0 or task_info.handle_grasped; same classifier as training dataset. Not a visual certification or a consecutive-duration test.",
+  "counts": {
+    "opened_with_grasp": 1,
+    "opened_without_grasp": 27,
+    "did_not_open": 62
+  },
+  "opening_success_rate": 0.3111111111111111,
+  "opened_with_grasp_rate": 0.011111111111111112
+}

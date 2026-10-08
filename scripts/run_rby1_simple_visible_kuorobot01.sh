@@ -2,28 +2,35 @@
 set -euo pipefail
 
 MODE="${1:-smoke}"
+SHARD_ARGS=()
 
 case "${MODE}" in
     smoke)
-        CONFIG="RBY1NavDoorOpeningSimpleVisibleSmokeConfig"
+        CONFIG="nav_door_baseline_smoke.yaml"
         ;;
     production-a)
-        CONFIG="RBY1NavDoorOpeningSimpleVisibleProductionAConfig"
+        CONFIG="nav_door_baseline.yaml"
+        SHARD_ARGS=(--shard a)
         ;;
     production-b)
-        CONFIG="RBY1NavDoorOpeningSimpleVisibleProductionBConfig"
+        CONFIG="nav_door_baseline.yaml"
+        SHARD_ARGS=(--shard b)
         ;;
     production-c)
-        CONFIG="RBY1NavDoorOpeningSimpleVisibleProductionCConfig"
+        CONFIG="nav_door_baseline.yaml"
+        SHARD_ARGS=(--shard c)
         ;;
     production-d)
-        CONFIG="RBY1NavDoorOpeningSimpleVisibleProductionDConfig"
+        CONFIG="nav_door_baseline.yaml"
+        SHARD_ARGS=(--shard d)
         ;;
     production-e)
-        CONFIG="RBY1NavDoorOpeningSimpleVisibleProductionEConfig"
+        CONFIG="nav_door_baseline.yaml"
+        SHARD_ARGS=(--shard e)
         ;;
     production-f)
-        CONFIG="RBY1NavDoorOpeningSimpleVisibleProductionFConfig"
+        CONFIG="nav_door_baseline.yaml"
+        SHARD_ARGS=(--shard f)
         ;;
     production-all | production-b-to-f)
         CONFIG=""
@@ -105,8 +112,9 @@ COMMAND=(
     "${PYTHON_ENV}/bin/python"
     -u
     -m
-    lrl_molmospaces_extensions.datagen.main
-    "lrl_molmospaces_extensions.configs.door_opening:${CONFIG}"
+    lrl_molmospaces_extensions.baseline.runner
+    --config "${PROJECT_ROOT}/configs/${CONFIG}"
+    "${SHARD_ARGS[@]}"
 )
 
 if [[ "${MODE}" == "smoke" ]]; then
