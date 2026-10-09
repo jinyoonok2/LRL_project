@@ -14,8 +14,8 @@ Start with these maintained guides:
 - [Research plan and next steps](docs/RESEARCH_PLAN.md)
 - [Extension commands](lrl_molmospaces_extensions/README.md)
 
-The current branch is `rby1-long-horizon-vla-training`. After the 2026-10-08
-cleanup, the other local branches are `main` and `rby1`. See the environment
+The current server branch is `rby1-long-horizon-vla-training`. The only other
+project branch is `main`, synchronized to the same commit. See the environment
 guide for exact submodule commits and the cleanup record.
 
 ## Repository layout
